@@ -17,6 +17,7 @@ const publicEntries = [
 ];
 
 export default defineConfig({
+  base: './',
   plugins: [react()],
   resolve: {
     alias: publicEntries.map(([find, to]) => ({ find, replacement: src(to) })),

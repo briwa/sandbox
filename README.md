@@ -30,10 +30,17 @@ Import only what you need. Each subpath is independently usable.
 | `@briwa.dev/sandbox/codemirror` | Editor widgets: cards, inline previews, slash commands | `@codemirror/*` |
 | `@briwa.dev/sandbox/editor` | CodeMirror services + a standalone syntax highlighter | `@codemirror/*` |
 | `@briwa.dev/sandbox/react` | The authoring modals | `react` |
-| `@briwa.dev/sandbox/astro` | Integration wiring all of the above | `astro` |
+| `@briwa.dev/sandbox/astro` | Integration wiring all of the above | an Astro site |
 
-The core is pure: string in, string out, zero imports. It runs identically in a build, a Cloudflare
-worker, and the browser.
+The core is pure: string in, string out, zero imports. `codemirror`, `editor` and `react` declare
+their CodeMirror and React needs as **peer dependencies**, so your copy is the only one loaded —
+two React instances break hooks, and two `@codemirror/state` instances reject each other's
+extensions. Nothing is bundled into the package.
+
+`@astrojs/internal-helpers` is the one optional peer: it is imported dynamically, only when you
+call `shikiHighlight()`, and an Astro site already has it.
+
+It runs identically in a build, a Cloudflare worker, and the browser.
 
 ## Astro
 
@@ -179,7 +186,14 @@ those literals must stay in sync. Renaming a key means grepping `src/core/index.
 ```
 npm run dev            # the demo pages, on Vite
 npm run demo:build     # …built to demo-dist/
+npm run demo:preview   # serve that build locally
 ```
+
+`demo-dist/` is a plain static bundle with relative asset paths (`base: './'`), so it works served
+from a domain root or any subdirectory — GitHub Pages project sites, Netlify, S3, a folder on an
+existing site. Upload the directory; there is nothing to configure. The only network call at
+runtime is the Vue runtime a `vue` figure pulls from jsDelivr, and only if such a figure is on the
+page — override it with `configureVueRuntime()` to self-host.
 
 Three pages, importing the package by its public name (the aliases in `vite.config.js` point them
 at `src/`, so edits show up with no package rebuild):
