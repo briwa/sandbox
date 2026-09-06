@@ -1,0 +1,250 @@
+import { Decoration, EditorView, WidgetType, ViewPlugin, keymap } from '@codemirror/view';
+import { StateField, StateEffect, Prec } from '@codemirror/state';
+import { autocompletion, completionStatus } from '@codemirror/autocomplete';
+import {
+  buildSrcdoc,
+  buildVueSrcdoc,
+  findSandboxBlocks,
+  sandboxPrelude,
+  sandboxExternals,
+  sandboxVueComponents,
+} from '../core/index.js';
+import { mountFigures } from '../client/index.js';
+
+const togglePreview = StateEffect.define();
+
+const previewField = StateField.define({
+  create() { return new Set(); },
+  update(set, tr) {
+    let next = set;
+    for (const e of tr.effects) {
+      if (e.is(togglePreview)) {
+        next = new Set(next);
+        if (next.has(e.value)) next.delete(e.value);
+        else next.add(e.value);
+      }
+    }
+    return next;
+  },
+});
+
+function removeBlock(view, from, to) {
+  const doc = view.state.doc;
+  let end = to;
+  if (end < doc.length && doc.sliceString(end, end + 1) === '\n') end += 1;
+  view.dispatch({ changes: { from, to: end, insert: '' } });
+  view.focus();
+}
+
+function toolBtn(className, label, onClick) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = className;
+  btn.textContent = label;
+  btn.addEventListener('mousedown', (e) => e.preventDefault());
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+
+export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confirm(m) } = {}) {
+
+  function editRemove(view, block) {
+    return [
+      toolBtn('cm-sbx-btn', 'Edit', () => onEdit?.(block)),
+      toolBtn('cm-sbx-btn danger', 'Remove', () => {
+        if (confirm('Remove this sandbox block?')) removeBlock(view, block.from, block.to);
+      }),
+    ];
+  }
+
+  class SandboxCard extends WidgetType {
+    constructor(block, index) { super(); this.block = block; this.index = index; }
+    sig() { const b = this.block; return `${b.from}:${b.to}:${b.vue}:${b.preset}:${b.bg}:${b.showCode}:${b.control}:${b.preview}:${b.id}`; }
+    eq(o) { return this.index === o.index && this.sig() === o.sig(); }
+    toDOM(view) {
+      const b = this.block;
+      const card = document.createElement('div');
+      card.className = 'cm-sbx-card';
+
+      const chips = document.createElement('div');
+      chips.className = 'cm-sbx-chips';
+      const label = document.createElement('span');
+      label.className = 'cm-sbx-label';
+      label.textContent = 'sandbox';
+      chips.appendChild(label);
+      const addChip = (text) => { const c = document.createElement('span'); c.className = 'cm-sbx-chip'; c.textContent = text; chips.appendChild(c); };
+      addChip(b.vue ? 'vue' : 'js');
+      addChip(b.vue ? 'root' : b.preset);
+      if (b.id) addChip(`id=${b.id}`);
+      if (b.bg) addChip(`bg=${b.bg}`);
+
+      const actions = document.createElement('div');
+      actions.className = 'cm-sbx-actions';
+      actions.append(
+        toolBtn('cm-sbx-btn', 'Show preview', () => view.dispatch({ effects: togglePreview.of(this.index) })),
+        ...editRemove(view, this.block),
+      );
+
+      card.append(chips, actions);
+      return card;
+    }
+    ignoreEvent() { return true; }
+  }
+
+  class LibCard extends WidgetType {
+    constructor(block, index, tag, label) { super(); this.block = block; this.index = index; this.tag = tag; this.label = label; }
+    eq(o) { return this.index === o.index && this.tag === o.tag && this.label === o.label && this.block.from === o.block.from && this.block.to === o.block.to; }
+    toDOM(view) {
+      const card = document.createElement('div');
+      card.className = 'cm-sbx-card';
+      const chips = document.createElement('div');
+      chips.className = 'cm-sbx-chips';
+      const tag = document.createElement('span');
+      tag.className = 'cm-sbx-chip';
+      tag.textContent = this.tag;
+      chips.appendChild(tag);
+      if (this.label) {
+        const lbl = document.createElement('span');
+        lbl.className = 'cm-sbx-label';
+        lbl.textContent = this.label;
+        chips.appendChild(lbl);
+      }
+      const actions = document.createElement('div');
+      actions.className = 'cm-sbx-actions';
+      actions.append(...editRemove(view, this.block));
+      card.append(chips, actions);
+      return card;
+    }
+    ignoreEvent() { return true; }
+  }
+
+  class PreviewWidget extends WidgetType {
+    constructor(block, srcdoc, index) { super(); this.block = block; this.srcdoc = srcdoc; this.index = index; }
+
+    eq(o) { return this.index === o.index && this.srcdoc === o.srcdoc; }
+    toDOM(view) {
+      const b = this.block;
+      const fig = document.createElement('figure');
+      fig.className = 'sandbox cm-sandbox';
+      fig.dataset.preset = b.vue ? 'root' : b.preset;
+
+      const stage = document.createElement('div');
+      stage.className = 'sandbox-stage';
+      const iframe = document.createElement('iframe');
+      iframe.className = 'sandbox-frame';
+      iframe.setAttribute('sandbox', 'allow-scripts');
+      iframe.title = `live ${b.vue ? 'vue' : b.preset} preview`;
+      iframe.srcdoc = this.srcdoc;
+      stage.appendChild(iframe);
+
+      const bar = document.createElement('div');
+      bar.className = 'cm-sbx-actions cm-sbx-actions-preview';
+      bar.append(
+        toolBtn('cm-sbx-btn', 'Hide preview', () => view.dispatch({ effects: togglePreview.of(this.index) })),
+        ...editRemove(view, this.block),
+      );
+
+      fig.append(stage, bar);
+      return fig;
+    }
+    ignoreEvent() { return true; }
+  }
+
+  function buildDecorations(state) {
+    const previews = state.field(previewField);
+    const blocks = findSandboxBlocks(state.doc.toString());
+    const ranges = [];
+    blocks.forEach((b, i) => {
+
+      if (!b.closed) return;
+      const replace = (widget) => ranges.push(Decoration.replace({ widget, block: true }).range(b.from, b.to));
+      if (b.snippet) {
+        replace(new LibCard(b, i, 'lib', b.summary));
+      } else if (b.external) {
+        replace(new LibCard(b, i, 'external-lib', b.summary));
+      } else if (b.vueLib) {
+        replace(new LibCard(b, i, 'vue lib', b.componentName || b.summary));
+      } else if (previews.has(i)) {
+
+        const externals = sandboxExternals(blocks, b.id);
+        const srcdoc = b.vue
+          ? buildVueSrcdoc(b, b.code, { externals, components: sandboxVueComponents(blocks, b.id) })
+          : buildSrcdoc(b, b.code, sandboxPrelude(blocks, b.id), externals);
+        replace(new PreviewWidget(b, srcdoc, i));
+      } else {
+        replace(new SandboxCard(b, i));
+      }
+    });
+    return Decoration.set(ranges, true);
+  }
+
+  const decorationField = StateField.define({
+    create(state) { return buildDecorations(state); },
+    update(value, tr) {
+      if (tr.docChanged || tr.effects.some((e) => e.is(togglePreview))) return buildDecorations(tr.state);
+      return value;
+    },
+    provide: (f) => EditorView.decorations.from(f),
+  });
+
+  const resizePlugin = ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.stop = mountFigures({
+          root: () => view.dom,
+          selector: '.cm-sandbox iframe',
+          sizeCode: false,
+          toggle: false,
+          prime: false,
+          onResize: () => view.requestMeasure(),
+        });
+      }
+      destroy() { this.stop(); }
+    }
+  );
+
+  const COMMANDS = { '/sandbox': 'figure', '/sandbox-lib': 'external', '/sandbox-source': 'source' };
+  const slashCommand = Prec.high(keymap.of([{
+    key: 'Enter',
+    run(view) {
+
+      if (completionStatus(view.state) === 'active') return false;
+      const line = view.state.doc.lineAt(view.state.selection.main.head);
+      const kind = COMMANDS[line.text.trim()];
+      if (!kind) return false;
+      view.dispatch({ changes: { from: line.from, to: line.to, insert: '' } });
+      onCreate?.(kind, line.from);
+      return true;
+    },
+  }]));
+
+  const SLASH_OPTIONS = [
+    { label: '/sandbox', kind: 'figure', detail: 'interactive figure' },
+    { label: '/sandbox-lib', kind: 'external', detail: 'external library' },
+    { label: '/sandbox-source', kind: 'source', detail: 'shared source' },
+  ];
+  const slashComplete = autocompletion({
+    override: [(ctx) => {
+      const line = ctx.state.doc.lineAt(ctx.pos);
+      const head = line.text.slice(0, ctx.pos - line.from);
+
+      if (!/^\/[\w-]*$/.test(head)) return null;
+      return {
+        from: line.from,
+        to: ctx.pos,
+        options: SLASH_OPTIONS.map((o) => ({
+          label: o.label,
+          detail: o.detail,
+          type: 'keyword',
+
+          apply: (view) => {
+            view.dispatch({ changes: { from: line.from, to: line.to, insert: '' } });
+            onCreate?.(o.kind, line.from);
+          },
+        })),
+      };
+    }],
+  });
+
+  return [previewField, decorationField, resizePlugin, slashComplete, slashCommand];
+}

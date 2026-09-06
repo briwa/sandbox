@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>playground &mdash; sandbox demos</title>
+  </head>
+  <body>
+    <nav>
+      <a href="../index.html">sandbox</a>
+      <a href="./figures.html">figures</a>
+      <a href="./playground.html" aria-current="page">playground</a>
+      <a href="./editor.html">editor</a>
+    </nav>
+
+    <h1>markdown in, live figures out</h1>
+    <p class="note">Edit the markdown; the figures rebuild as you type.</p>
+
+    <div class="controls">
+      <label for="preset">load</label>
+      <select id="preset"></select>
+      <span id="status"></span>
+    </div>
+
+    <div class="split">
+      <textarea id="source" spellcheck="false" aria-label="Markdown source"></textarea>
+      <div class="prose" id="prose"></div>
+    </div>
+
+    <script type="module" src="./playground.js"></script>
+  </body>
+</html>

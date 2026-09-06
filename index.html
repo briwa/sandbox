@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sandbox demos</title>
+    <link rel="stylesheet" href="./demo/demo.css" />
+  </head>
+  <body>
+    <h1>@briwa.dev/sandbox</h1>
+
+    <p>
+      A fenced code block becomes a live, isolated iframe figure. Each figure gets its own
+      disposable realm &mdash; <code>srcdoc</code>, <code>sandbox="allow-scripts"</code>, no
+      <code>allow-same-origin</code> &mdash; so it cannot reach the page around it.
+    </p>
+
+    <ul>
+      <li><a href="./demo/figures.html">figures</a> &mdash; every block type, rendered from markdown</li>
+      <li><a href="./demo/playground.html">playground</a> &mdash; edit markdown, watch the figures rebuild</li>
+      <li><a href="./demo/editor.html">editor</a> &mdash; the authoring UI: widgets, slash commands, modals</li>
+    </ul>
+
+    <p class="note">
+      These pages import the package by its public name; the aliases in
+      <code>vite.config.js</code> point them at <code>src/</code>, so edits show up without a
+      package rebuild.
+    </p>
+  </body>
+</html>

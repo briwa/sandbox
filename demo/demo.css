@@ -1,0 +1,156 @@
+:root {
+  color-scheme: light dark;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+body {
+  margin: 0;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+nav {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  font-size: 0.8rem;
+}
+
+nav a {
+  color: inherit;
+}
+
+nav [aria-current='page'] {
+  text-decoration: none;
+  opacity: 0.5;
+}
+
+h1 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.5;
+  margin: 0 0 0.5rem;
+}
+
+p,
+li {
+  font-size: 0.85rem;
+  line-height: 1.7;
+  max-width: 60ch;
+}
+
+ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+button,
+select {
+  font: inherit;
+  font-size: 0.8rem;
+  color: inherit;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+
+/* The rendered-markdown column. Sized like a reading column so the figures' own 90% inset
+   (see figure.css) reads the way it does in a real entry. */
+.prose {
+  width: min(46rem, 100%);
+  font-family: system-ui, sans-serif;
+}
+
+.prose :is(h1, h2, h3) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.prose pre {
+  overflow-x: auto;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  font-size: 0.8rem;
+}
+
+/* The demo has no design tokens of its own, so give the package the two it cares most about.
+   --bg in particular is what a figure is handed for its own background (see mountFigures). */
+:root {
+  --bg: Canvas;
+  --ink: CanvasText;
+}
+
+/* Two-column playground: markdown source on the left, live figures on the right. */
+.split {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.split > * {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+
+textarea {
+  width: 100%;
+  min-height: 26rem;
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: inherit;
+  background: none;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 6px;
+  padding: 0.7rem;
+  resize: vertical;
+}
+
+/* The editor demo's CodeMirror host. */
+.editor {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.editor .cm-editor {
+  max-height: 34rem;
+}
+
+.editor .cm-scroller {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.note {
+  font-size: 0.78rem;
+  opacity: 0.6;
+  max-width: 60ch;
+}
