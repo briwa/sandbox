@@ -206,7 +206,7 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
   const script =
     VIS_GATE +
     `const root=document.querySelector('#root');` +
-    `const report=()=>parent.postMessage({__sandboxHeight:document.documentElement.scrollHeight},'*');` +
+    `const report=()=>parent.postMessage({__sandboxHeight:document.body.scrollHeight},'*');` +
     `new ResizeObserver(report).observe(document.documentElement);` +
     (bg ? '' : themeBgListener) +
     `const __files={${files}};` +
@@ -349,7 +349,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
     resetVars +
     loopDef +
     resetApi +
-    `const report=()=>parent.postMessage({__sandboxHeight:document.documentElement.scrollHeight},'*');` +
+    `const report=()=>parent.postMessage({__sandboxHeight:document.body.scrollHeight},'*');` +
     `new ResizeObserver(report).observe(document.documentElement);` +
     themeSync +
 

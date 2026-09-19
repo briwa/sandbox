@@ -265,6 +265,7 @@
 .sbx-ctl.sbx-icon { display: inline-flex; align-items: center; justify-content: center; padding: 0.35rem; }
 .sbx-frame {
   width: 100%;
+  flex: none;
   border: 0;
   outline: 1px solid var(--sbx-rule);
   outline-offset: -1px;

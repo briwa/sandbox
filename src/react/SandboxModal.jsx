@@ -58,6 +58,7 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
   const [groupId, setGroupId] = useState(seed.id || "");
   const [srcdoc, setSrcdoc] = useState("");
   const [previewW, setPreviewW] = useState(initial.w || 640);
+  const [previewH, setPreviewH] = useState(initial.h || 360);
   const [playing, setPlaying] = useState(false);
 
   const [frameKey, setFrameKey] = useState(0);
@@ -85,9 +86,11 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
     if (!isFigure) return;
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     const width = Number(w) || 0;
+    const height = Number(h) || 0;
 
-    setSrcdoc(buildPreview({ type, w: width, h: Number(h) || 0, bg: bg || figureBg(), id: groupId }, body, siblings));
+    setSrcdoc(buildPreview({ type, w: width, h: height, bg: bg || figureBg(), id: groupId }, body, siblings));
     setPreviewW(width || 640);
+    setPreviewH(height || 360);
     setFrameKey((k) => k + 1);
     setDirty(false);
   }
@@ -189,11 +192,15 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
       if (!frameRef.current || frameRef.current.contentWindow !== e.source || !e.data) return;
       if (e.data.__sandboxReset) { setPlaying(false); return; }
       const height = e.data.__sandboxHeight;
-      if (typeof height === "number" && height > 0) frameRef.current.style.height = height + "px";
+      if (typeof height !== "number" || height <= 0) return;
+
+      const frame = frameRef.current;
+      const natural = previewW > 0 ? (frame.clientWidth * previewH) / previewW : 0;
+      frame.style.height = natural > 0 && height <= natural + 1 ? "" : height + "px";
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [previewW, previewH]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -384,7 +391,7 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
               key={frameKey}
               ref={frameRef}
               className="sbx-frame"
-              style={{ width: `${previewW}px`, maxWidth: "100%" }}
+              style={{ width: `${previewW}px`, maxWidth: "100%", aspectRatio: `${previewW} / ${previewH}` }}
               sandbox="allow-scripts"
               title="live figure preview"
               srcDoc={srcdoc}
