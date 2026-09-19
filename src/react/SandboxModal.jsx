@@ -73,8 +73,6 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
   const cmRef = useRef(null);
   const frameRef = useRef(null);
   const saveRef = useRef(null);
-  const metaInitRef = useRef(false);
-  const draftInitRef = useRef(false);
   const clearedRef = useRef(false);
   const persistRef = useRef(null);
   const saveTimer = useRef(null);
@@ -164,15 +162,28 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
     if (cmRef.current) cmRef.current.dispatch({ effects: langCompartment.reconfigure(langSupport(codeLang)) });
   }, [codeLang]);
 
-  useEffect(() => {
-    if (!metaInitRef.current) { metaInitRef.current = true; return; }
-    setDirty(true);
-  }, [type, w, h, bg, label, groupId, srcLang, name]);
+  // Both effects below react to a *change* in the toolbar values, and both used
+  // to detect one by skipping their first run. That miscounts: StrictMode mounts,
+  // unmounts and remounts in development, the refs survive it, and the second run
+  // fell straight through the guard — so every modal opened already dirty and
+  // wrote a recovery draft for an edit nobody had made. Comparing snapshots
+  // instead is indifferent to how many times the effect runs.
+  const metaSnapshot = JSON.stringify([type, w, h, bg, label, groupId, srcLang, name]);
+  const draftSnapshot = JSON.stringify([type, w, h, bg, showCode, control, preview, label, srcLang, name, groupId]);
+  const metaSeenRef = useRef(metaSnapshot);
+  const draftSeenRef = useRef(draftSnapshot);
 
   useEffect(() => {
-    if (!draftInitRef.current) { draftInitRef.current = true; return; }
+    if (metaSnapshot === metaSeenRef.current) return;
+    metaSeenRef.current = metaSnapshot;
+    setDirty(true);
+  }, [metaSnapshot]);
+
+  useEffect(() => {
+    if (draftSnapshot === draftSeenRef.current) return;
+    draftSeenRef.current = draftSnapshot;
     scheduleSaveRef.current();
-  }, [type, w, h, bg, showCode, control, preview, label, srcLang, name, groupId]);
+  }, [draftSnapshot]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
