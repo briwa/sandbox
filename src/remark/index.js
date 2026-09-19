@@ -46,12 +46,12 @@ export function remarkSandbox({ highlight } = {}) {
 
         if (spec.snippet) {
           const libHtml = await highlightCode(code);
-          const summary = spec.summary || 'Click to see the code';
+          const label = spec.label || 'Click to see the code';
           parent.children[index] = {
             type: 'html',
             value:
               `<details class="sandbox sandbox-lib">` +
-              `<summary><span class="sandbox-lib-tag">lib</span><span class="sandbox-lib-label">${escapeHtml(summary)}</span></summary>` +
+              `<summary><span class="sandbox-lib-tag">lib</span><span class="sandbox-lib-label">${escapeHtml(label)}</span></summary>` +
               `${libHtml}</details>`,
           };
           return;
@@ -59,7 +59,7 @@ export function remarkSandbox({ highlight } = {}) {
 
         if (spec.external) {
           const urls = (code || '').split(/\s+/).map(safeUrl).filter(Boolean);
-          const summary = spec.summary || 'External library';
+          const label = spec.label || 'External library';
           const body = urls.length
             ? urls
                 .map(
@@ -72,7 +72,7 @@ export function remarkSandbox({ highlight } = {}) {
             type: 'html',
             value:
               `<details class="sandbox sandbox-lib sandbox-external">` +
-              `<summary><span class="sandbox-lib-tag">external-lib</span><span class="sandbox-lib-label">${escapeHtml(summary)}</span></summary>` +
+              `<summary><span class="sandbox-lib-tag">external-lib</span><span class="sandbox-lib-label">${escapeHtml(label)}</span></summary>` +
               `<div class="sandbox-external-urls">${body}</div></details>`,
           };
           return;
@@ -80,12 +80,12 @@ export function remarkSandbox({ highlight } = {}) {
 
         if (spec.vueLib) {
           const libHtml = await highlightCode(code, 'vue');
-          const summary = spec.summary || 'Vue component';
+          const label = spec.label || 'Vue component';
           parent.children[index] = {
             type: 'html',
             value:
               `<details class="sandbox sandbox-lib">` +
-              `<summary><span class="sandbox-lib-tag">vue lib</span><span class="sandbox-lib-label">${escapeHtml(summary)}</span></summary>` +
+              `<summary><span class="sandbox-lib-tag">vue lib</span><span class="sandbox-lib-label">${escapeHtml(label)}</span></summary>` +
               `${libHtml}</details>`,
           };
           return;

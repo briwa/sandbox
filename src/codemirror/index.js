@@ -4,12 +4,29 @@ import { autocompletion, completionStatus } from '@codemirror/autocomplete';
 import {
   buildSrcdoc,
   buildVueSrcdoc,
+  describeSandboxBlock,
   findSandboxBlocks,
   sandboxPrelude,
   sandboxExternals,
   sandboxVueComponents,
 } from '../core/index.js';
 import { mountFigures } from '../client/index.js';
+import { iconSvg } from '../editor/icons.js';
+
+const LIB_CHIPS = {
+  lib: [['file', 'lib']],
+  'external-lib': [['file', 'lib'], ['globe', 'external']],
+  'vue lib': [['file', 'lib'], ['vue', 'vue']],
+};
+
+function iconChip(name, title) {
+  const chip = document.createElement('span');
+  chip.className = 'cm-sbx-chip icon';
+  chip.title = title;
+  chip.setAttribute('aria-label', title);
+  chip.innerHTML = iconSvg(name, 13);
+  return chip;
+}
 
 const togglePreview = StateEffect.define();
 
@@ -36,11 +53,14 @@ function removeBlock(view, from, to) {
   view.focus();
 }
 
-function toolBtn(className, label, onClick) {
+function toolBtn(className, label, onClick, icon) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = className;
-  btn.textContent = label;
+  btn.className = icon ? `${className} icon` : className;
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+  if (icon) btn.innerHTML = iconSvg(icon);
+  else btn.textContent = label;
   btn.addEventListener('mousedown', (e) => e.preventDefault());
   btn.addEventListener('click', onClick);
   return btn;
@@ -50,16 +70,16 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
 
   function editRemove(view, block) {
     return [
-      toolBtn('cm-sbx-btn', 'Edit', () => onEdit?.(block)),
+      toolBtn('cm-sbx-btn', 'Edit', () => onEdit?.(block), 'pencil'),
       toolBtn('cm-sbx-btn danger', 'Remove', () => {
         if (confirm('Remove this sandbox block?')) removeBlock(view, block.from, block.to);
-      }),
+      }, 'trash'),
     ];
   }
 
   class SandboxCard extends WidgetType {
-    constructor(block, index) { super(); this.block = block; this.index = index; }
-    sig() { const b = this.block; return `${b.from}:${b.to}:${b.vue}:${b.preset}:${b.bg}:${b.showCode}:${b.control}:${b.preview}:${b.id}`; }
+    constructor(block, index) { super(); this.block = block; this.index = index; this.name = describeSandboxBlock(block).label; }
+    sig() { const b = this.block; return `${b.from}:${b.to}:${b.vue}:${b.preset}:${b.bg}:${b.showCode}:${b.control}:${b.preview}:${b.id}:${this.name}`; }
     eq(o) { return this.index === o.index && this.sig() === o.sig(); }
     toDOM(view) {
       const b = this.block;
@@ -70,18 +90,21 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       chips.className = 'cm-sbx-chips';
       const label = document.createElement('span');
       label.className = 'cm-sbx-label';
-      label.textContent = 'sandbox';
+      label.textContent = this.name;
+      label.title = this.name;
       chips.appendChild(label);
       const addChip = (text) => { const c = document.createElement('span'); c.className = 'cm-sbx-chip'; c.textContent = text; chips.appendChild(c); };
-      addChip(b.vue ? 'vue' : 'js');
-      addChip(b.vue ? 'root' : b.preset);
+      const lang = b.vue ? 'vue' : 'js';
+      const preset = b.vue ? 'root' : b.preset;
+      chips.appendChild(iconChip(lang, lang));
+      chips.appendChild(iconChip(preset, preset));
       if (b.id) addChip(`id=${b.id}`);
       if (b.bg) addChip(`bg=${b.bg}`);
 
       const actions = document.createElement('div');
       actions.className = 'cm-sbx-actions';
       actions.append(
-        toolBtn('cm-sbx-btn', 'Show preview', () => view.dispatch({ effects: togglePreview.of(this.index) })),
+        toolBtn('cm-sbx-btn', 'Show preview', () => view.dispatch({ effects: togglePreview.of(this.index) }), 'eye'),
         ...editRemove(view, this.block),
       );
 
@@ -99,16 +122,14 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       card.className = 'cm-sbx-card';
       const chips = document.createElement('div');
       chips.className = 'cm-sbx-chips';
-      const tag = document.createElement('span');
-      tag.className = 'cm-sbx-chip';
-      tag.textContent = this.tag;
-      chips.appendChild(tag);
       if (this.label) {
         const lbl = document.createElement('span');
         lbl.className = 'cm-sbx-label';
         lbl.textContent = this.label;
+        lbl.title = this.label;
         chips.appendChild(lbl);
       }
+      for (const [icon, title] of LIB_CHIPS[this.tag] ?? LIB_CHIPS.lib) chips.appendChild(iconChip(icon, title));
       const actions = document.createElement('div');
       actions.className = 'cm-sbx-actions';
       actions.append(...editRemove(view, this.block));
@@ -140,7 +161,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       const bar = document.createElement('div');
       bar.className = 'cm-sbx-actions cm-sbx-actions-preview';
       bar.append(
-        toolBtn('cm-sbx-btn', 'Hide preview', () => view.dispatch({ effects: togglePreview.of(this.index) })),
+        toolBtn('cm-sbx-btn', 'Hide preview', () => view.dispatch({ effects: togglePreview.of(this.index) }), 'eyeOff'),
         ...editRemove(view, this.block),
       );
 
@@ -159,11 +180,11 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       if (!b.closed) return;
       const replace = (widget) => ranges.push(Decoration.replace({ widget, block: true }).range(b.from, b.to));
       if (b.snippet) {
-        replace(new LibCard(b, i, 'lib', b.summary));
+        replace(new LibCard(b, i, 'lib', describeSandboxBlock(b).label));
       } else if (b.external) {
-        replace(new LibCard(b, i, 'external-lib', b.summary));
+        replace(new LibCard(b, i, 'external-lib', describeSandboxBlock(b).label));
       } else if (b.vueLib) {
-        replace(new LibCard(b, i, 'vue lib', b.componentName || b.summary));
+        replace(new LibCard(b, i, 'vue lib', describeSandboxBlock(b).label));
       } else if (previews.has(i)) {
 
         const externals = sandboxExternals(blocks, b.id);

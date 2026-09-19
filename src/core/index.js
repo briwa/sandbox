@@ -32,11 +32,62 @@ export function specToToolbar(spec = {}) {
     showCode: Boolean(spec.showCode),
     control: spec.control || 'pausable',
     preview: Boolean(spec.preview),
+    label: spec.label || '',
     id: spec.id || '',
   };
 }
 
-export function serializeSandboxMeta({ type, w, h, bg, showCode, control, preview, id }) {
+const DECLARATIONS = [
+  /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/,
+  /^\s*(?:export\s+(?:default\s+)?)?class\s+([A-Za-z_$][\w$]*)/,
+  /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:function\b|\(|[A-Za-z_$][\w$]*\s*=>)/,
+];
+
+const firstDeclaration = (code) => {
+  for (const line of (code || '').split('\n')) {
+    if (/^\s*(?:\/\/|\/\*|\*)/.test(line)) continue;
+    for (const re of DECLARATIONS) {
+      const m = re.exec(line);
+      if (m) return m[1];
+    }
+  }
+  return '';
+};
+
+const trimUrl = (s) => {
+  if (!/^https?:\/\//i.test(s)) return s;
+  const parts = s.split(/[?#]/)[0].replace(/\/+$/, '').split('/').filter(Boolean);
+  const last = parts[parts.length - 1] || '';
+  return /^[0-9a-f]{7,}$/i.test(last) ? parts[parts.length - 2] || last : last;
+};
+
+const detailOf = (label, ...parts) => parts.filter((p) => p && p !== label).join(' · ');
+
+export function describeSandboxBlock(spec = {}) {
+  const group = spec.id ? `#${spec.id}` : '';
+  const named = firstDeclaration(spec.code);
+
+  if (spec.vueLib) {
+    const label = spec.label || spec.componentName || named || spec.id || 'vue component';
+    return { kind: 'vue-lib', label, detail: detailOf(label, 'vue component', group) };
+  }
+  if (spec.external) {
+    const first = (spec.code || '').split(/\s+/).filter(Boolean)[0] || '';
+    const label = trimUrl(spec.label || '') || trimUrl(first) || spec.id || 'external library';
+    return { kind: 'external', label, detail: detailOf(label, 'external library', group) };
+  }
+  if (spec.snippet) {
+    const label = spec.label || named || spec.id || 'shared source';
+    return { kind: 'snippet', label, detail: detailOf(label, 'shared source', group) };
+  }
+
+  const type = spec.vue ? 'vue' : spec.preset || 'canvas';
+  const size = `${type} ${spec.w || DEFAULT_W}×${spec.h || DEFAULT_H}`;
+  const label = spec.label || named || size;
+  return { kind: 'figure', label, detail: detailOf(label, size, group) };
+}
+
+export function serializeSandboxMeta({ type, w, h, bg, showCode, control, preview, label, id }) {
   const lang = type === 'vue' ? 'vue' : 'js';
   const tokens = [];
   if (type !== 'vue') tokens.push(type);
@@ -45,6 +96,7 @@ export function serializeSandboxMeta({ type, w, h, bg, showCode, control, previe
   if (showCode) tokens.push('code');
   if (control && control !== 'pausable' && type !== 'vue') tokens.push(`control=${control}`);
   if (preview) tokens.push('preview');
+  if (label) tokens.push(`label="${escapeAttr(label)}"`);
   if (id) tokens.push(`id="${id}"`);
   return { lang, meta: tokens.join(' ') };
 }
@@ -74,6 +126,8 @@ export function configureVueRuntime({ vue, sfcLoader } = {}) {
 
 export const escapeAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
+export const unescapeAttr = (s) => s.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+
 export const escapeHtml = (s) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -81,20 +135,23 @@ export function parseMeta(lang, meta) {
   const isVue = lang === 'vue';
   if (lang !== 'js' && lang !== 'javascript' && !isVue) return null;
   const raw = (meta || '').trim();
-  const tokens = raw.split(/\s+/).filter(Boolean);
+  const tokens = raw.replace(/([\w-]+)="[^"]*"/g, '$1').split(/\s+/).filter(Boolean);
   const preset = tokens.find((t) => PRESETS.has(t));
 
   const idMatch = /(?:^|\s)id="([^"]*)"/.exec(raw);
   let id = idMatch ? idMatch[1] : '';
   if (id && !/^[\w-]+$/.test(id)) id = '';
 
+  const labelMatch = /(?:^|\s)label="([^"]*)"/.exec(raw);
+  const label = labelMatch ? unescapeAttr(labelMatch[1]).trim() : '';
+
   if (isVue) {
 
     const libMatch = /(?:^|\s)lib="([^"]*)"/.exec(raw);
     if (libMatch || tokens.some((t) => t === 'lib' || t.startsWith('lib='))) {
-      let name = libMatch ? libMatch[1] : '';
-      if (name && !/^[A-Za-z][\w-]*$/.test(name)) name = '';
-      return { vue: true, vueLib: true, componentName: name, summary: name, id };
+      const name = libMatch ? libMatch[1].trim() : '';
+      const component = /^[A-Za-z][\w-]*$/.test(name) ? name : '';
+      return { vue: true, vueLib: true, componentName: component, label: name, id };
     }
 
     const vsize = tokens.find((t) => /^\d+x\d+$/.test(t));
@@ -102,17 +159,17 @@ export function parseMeta(lang, meta) {
     const vbgMatch = /(?:^|\s)bg="([^"]*)"/.exec(raw);
     let vbg = vbgMatch ? vbgMatch[1] : '';
     if (vbg && !/^[#\w(),.%\s-]+$/.test(vbg)) vbg = '';
-    return { vue: true, preset: 'root', w: vw, h: vh, showCode: tokens.includes('code'), bg: vbg, id, preview: tokens.includes('preview') };
+    return { vue: true, preset: 'root', w: vw, h: vh, showCode: tokens.includes('code'), bg: vbg, label, id, preview: tokens.includes('preview') };
   }
 
   if (!preset && tokens.some((t) => t === 'external-lib' || t.startsWith('external-lib='))) {
     const m = /(?:^|\s)external-lib="([^"]*)"/.exec(raw);
-    return { external: true, summary: m ? m[1] : '', id };
+    return { external: true, label: m ? m[1].trim() : '', id };
   }
 
   if (!preset && tokens.some((t) => t === 'lib' || t.startsWith('lib='))) {
     const m = /(?:^|\s)lib="([^"]*)"/.exec(raw);
-    return { snippet: true, summary: m ? m[1] : '', id };
+    return { snippet: true, label: m ? m[1].trim() : '', id };
   }
   if (!preset) return null;
   const size = tokens.find((t) => /^\d+x\d+$/.test(t));
@@ -128,7 +185,7 @@ export function parseMeta(lang, meta) {
   let bg = bgMatch ? bgMatch[1] : '';
   if (bg && !/^[#\w(),.%\s-]+$/.test(bg)) bg = '';
 
-  return { preset, w, h, showCode, bg, control, id, preview: tokens.includes('preview') };
+  return { preset, w, h, showCode, bg, control, label, id, preview: tokens.includes('preview') };
 }
 
 export function sandboxPrelude(blocks, groupId = '') {

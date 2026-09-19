@@ -130,8 +130,32 @@ follow the theme, gates animation on visibility so off-screen figures stop burni
 | ```` ```js external-lib ```` | Body is a list of https `.js` URLs to inject |
 
 Modifiers: `640x360` size · `bg="#111"` background · `code` show-code toggle ·
-`control=pausable|auto|none` playback · `preview` nominate as cover · `id="group"` partition blocks
-into groups so a figure only pulls its own group's libraries.
+`control=pausable|auto|none` playback · `preview` nominate as cover · `label="…"` human name for a
+figure · `id="group"` partition blocks into groups so a figure only pulls its own group's libraries.
+
+`label` is free text — double quotes and ampersands in it are escaped as `&quot;` / `&amp;` in the
+fence and decoded on the way back. It names a figure for a table of contents or a sidebar. `id`
+stays functional: it partitions groups and is restricted to `[\w-]+`.
+
+Every fence kind reports its name as `label`, so a consumer reads one field. Figures take the
+`label="…"` tag; `lib` and `external-lib` fences already carry a name in the tag itself, and that
+value *is* their `label`. A `vue lib` fence also keeps `componentName` alongside it — that one is
+functional, the validated tag the component registers under, so a name Vue would reject shows up as
+a `label` with no `componentName`.
+
+To list the blocks in a document, hand each one from `findSandboxBlocks` to `describeSandboxBlock`:
+
+```js
+import { findSandboxBlocks, describeSandboxBlock } from '@briwa.dev/sandbox';
+
+findSandboxBlocks(doc).map(describeSandboxBlock);
+// → { kind: 'figure' | 'snippet' | 'external' | 'vue-lib', label, detail }
+```
+
+Its `label` is always a non-empty string, so a row renders it with no branching: the fence's own
+`label` wins, then the first function or class declared in the fence body, then the preset and size
+(`canvas 640×360`). `detail` is secondary text — the preset and size, the kind, the `#group` — and
+may be empty. An `external-lib` whose name is a raw-gist URL is trimmed to its filename.
 
 An ordinary ```` ```js ```` fence with no preset passes straight through to your normal highlighter.
 

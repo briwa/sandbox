@@ -51,6 +51,7 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
   const [showCode, setShowCode] = useState(Boolean(seed.showCode));
   const [control, setControl] = useState(seed.control || "pausable");
   const [preview, setPreview] = useState(Boolean(seed.preview));
+  const [label, setLabel] = useState(seed.label || "");
 
   const [srcLang, setSrcLang] = useState(seed.srcLang || "js");
   const [name, setName] = useState(seed.name || "");
@@ -98,7 +99,7 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
   const persist = () => {
     if (!draftKey || clearedRef.current) return;
     const code = cmRef.current ? cmRef.current.state.doc.toString() : (seed.code || "");
-    saveSandboxDraft(draftKey, { type, w, h, bg, showCode, control, preview, srcLang, name, id: groupId, code });
+    saveSandboxDraft(draftKey, { type, w, h, bg, showCode, control, preview, label, srcLang, name, id: groupId, code });
   };
   persistRef.current = persist;
   const scheduleSave = () => {
@@ -166,12 +167,12 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
   useEffect(() => {
     if (!metaInitRef.current) { metaInitRef.current = true; return; }
     setDirty(true);
-  }, [type, w, h, bg, groupId, srcLang, name]);
+  }, [type, w, h, bg, label, groupId, srcLang, name]);
 
   useEffect(() => {
     if (!draftInitRef.current) { draftInitRef.current = true; return; }
     scheduleSaveRef.current();
-  }, [type, w, h, bg, showCode, control, preview, srcLang, name, groupId]);
+  }, [type, w, h, bg, showCode, control, preview, label, srcLang, name, groupId]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -249,7 +250,7 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
   function save() {
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     if (isFigure) {
-      const state = { type, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, preview, id: groupId };
+      const state = { type, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, preview, label, id: groupId };
       onSave(buildSandboxFence(state, body), { keepOpen: true });
       updatePreview();
     } else {
@@ -293,6 +294,10 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
               <label className="sbx-field">
                 <span>Background</span>
                 <input type="text" placeholder="#111 / transparent" value={bg} onChange={(e) => setBg(e.target.value)} />
+              </label>
+              <label className="sbx-field">
+                <span>Label</span>
+                <input type="text" placeholder="what this is" value={label} onChange={(e) => setLabel(e.target.value)} />
               </label>
               <label className="sbx-field">
                 <span>Group</span>
