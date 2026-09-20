@@ -20,7 +20,9 @@ const VIS_GATE =
 
 export const SANDBOX_TYPES = ['canvas', 'svg', 'root', 'vue'];
 
-export const CONTROL_MODES = ['pausable', 'auto', 'none'];
+// Who drives playback. The last two hand that job to the host page: `manual` waits for
+// play/pause/reset messages, `hover` runs only while the host says the pointer is on it.
+export const CONTROL_MODES = ['pausable', 'auto', 'none', 'manual', 'hover'];
 export { DEFAULT_W, DEFAULT_H };
 
 export function specToToolbar(spec = {}) {
@@ -290,8 +292,9 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
   const isRoot = preset === 'root';
   const mode = control || 'pausable';
   const isManual = mode === 'manual';
+  const isHover = Boolean(hover) || mode === 'hover';
 
-  const pausable = isCanvas && (mode === 'pausable' || mode === 'auto') && !hover;
+  const pausable = isCanvas && (mode === 'pausable' || mode === 'auto') && !isHover;
   const surface = isCanvas
     ? '<canvas></canvas>'
     : isRoot
@@ -309,7 +312,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
     .map((u) => `<script src="${u}"></script>`)
     .join('');
 
-  const deferred = (isCanvas || isRoot) && mode === 'pausable' && !hover;
+  const deferred = (isCanvas || isRoot) && mode === 'pausable' && !isHover;
   const playBtn = deferred
     ? `<button id="__play" type="button" aria-label="Run figure"><svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true"><polygon points="38,28 38,72 74,50" fill="currentColor"/></svg></button>`
     : '';
@@ -331,10 +334,10 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
   const themeSync = `let __bgSeen;addEventListener('message',function(e){if(e.data&&e.data.__sbxBg&&e.data.__sbxBg!==__bgSeen){__bgSeen=e.data.__sbxBg;${bg ? '' : `document.documentElement.style.setProperty('--sbx-bg',e.data.__sbxBg);`}report()}});`;
 
   const rootCss = isRoot
-    ? (hover ? `#root{position:relative;width:100%;height:100%}` : `#root{position:relative;width:${w}px;height:${h}px;max-width:100%;margin-inline:auto}`)
+    ? (isHover ? `#root{position:relative;width:100%;height:100%}` : `#root{position:relative;width:${w}px;height:${h}px;max-width:100%;margin-inline:auto}`)
     : '';
 
-  const media = hover
+  const media = isHover
     ? `html,body{height:100%}canvas,svg{display:block;width:100%;height:100%}`
     : `canvas,svg{display:block;max-width:100%;height:auto;margin-inline:auto}`;
 
@@ -345,9 +348,9 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
       `const start=()=>__fx.reduce((p,u)=>p.then(()=>fetch(u)).then(r=>{if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);return r.text()}).then(t=>{const s=document.createElement('script');s.textContent=t;document.head.appendChild(s)}),Promise.resolve()).then(run,e=>{document.body.innerHTML='<pre class=err>'+(e&&e.stack||e)+'</pre>';report()});`
     : `const start=run;`;
 
-  const resettable = (isCanvas || isRoot) && !hover;
+  const resettable = (isCanvas || isRoot) && !isHover;
 
-  const loopDef = hover
+  const loopDef = isHover
     ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0;const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(0)};`
     : isManual
 
@@ -375,7 +378,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
     ? `const onCleanup=(fn)=>{__cleanups.push(fn)};` +
       `const __teardown=()=>{if(__stop){__stop();__stop=null}__cleanups.forEach(function(fn){try{fn()}catch(_){}});__cleanups=[];${isCanvas ? 'canvas.width=width' : "root.innerHTML=''"}};` +
       `const reset=()=>{__teardown();${resetHome};parent.postMessage({__sandboxReset:1},'*')};`
-    : hover
+    : isHover
 
       ? `const onCleanup=()=>{};const reset=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}__el=0;__t0=null;__now=0;__fn=null;run()};`
       : `const onCleanup=()=>{};const reset=()=>{};`;
@@ -401,7 +404,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
     : isManual
 
       ? `start();addEventListener('message',function(e){if(!e.data)return;if(e.data.__figpause){if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now}}else if(e.data.__figplay){if(__raf==null&&__fn){__t0=null;__raf=requestAnimationFrame(__tick)}}${resettable ? `else if(e.data.__figreset){reset()}` : ''}});`
-      : hover
+      : isHover
 
         ? `start();addEventListener('message',function(e){if(!__fn||!e.data)return;if(e.data.__figplay){if(__raf==null){__t0=null;__raf=requestAnimationFrame(__tick)}}else if('__figplay' in e.data){reset()}});`
 

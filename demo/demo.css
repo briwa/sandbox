@@ -95,6 +95,15 @@ select {
   cursor: pointer;
 }
 
+/* The host-side buttons for the manual control sample, lined up under its figure. */
+.manual-controls {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  width: 90%;
+  margin: -0.9rem auto 0;
+}
+
 /* The rendered-markdown column. Sized like a reading column so the figures' own 90% inset
    (see figure.css) reads the way it does in a real entry. */
 .prose {

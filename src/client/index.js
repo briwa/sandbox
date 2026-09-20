@@ -1,4 +1,4 @@
-import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE } from '../core/protocol.js';
+import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET } from '../core/protocol.js';
 import { iconSvg } from '../core/icons.js';
 
 let bgVar = '--bg';
@@ -18,6 +18,45 @@ export function watchFigureTheme(frames) {
   const mq = matchMedia('(prefers-color-scheme: dark)');
   mq.addEventListener('change', push);
   return () => { obs.disconnect(); mq.removeEventListener('change', push); };
+}
+
+// Accepts an iframe, a figure element, or a window, so a caller can hand over whatever
+// it already has in hand.
+const figureWindow = (target) => {
+  if (!target) return null;
+  if (typeof target.postMessage === 'function') return target;
+  const frame = target.tagName === 'IFRAME' ? target : target.querySelector?.('.sandbox-frame');
+  return frame?.contentWindow ?? null;
+};
+
+const postToFigure = (target, msg) => figureWindow(target)?.postMessage(msg, '*');
+
+// For `control=manual`: the host decides when the figure runs.
+export const playFigure = (target) => postToFigure(target, { [MSG_PLAY]: true });
+export const pauseFigure = (target) => postToFigure(target, { [MSG_PAUSE]: true });
+export const resetFigure = (target) => postToFigure(target, { [MSG_RESET]: true });
+
+// For `control=hover`: entering runs it, leaving rewinds it to the first frame. mountFigures
+// wires these for you; call them directly to drive a figure from a larger region, like a card.
+export const enterFigure = (target) => postToFigure(target, { [MSG_PLAY]: true });
+export const leaveFigure = (target) => postToFigure(target, { [MSG_PLAY]: false });
+
+const HOVER_FIGURE = ".sandbox[data-control='hover']";
+
+// A frame swallows the pointer, so neither document sees it cross the boundary. remark lays a
+// .sandbox-hover surface over the frame for exactly this reason: with a host-document element
+// as the hit target, enter and leave fire on the figure normally.
+export function watchFigureHover(root = document) {
+  const scope = () => (typeof root === 'function' ? root() : root);
+  const wired = new WeakSet();
+  return function sync() {
+    for (const fig of scope()?.querySelectorAll(HOVER_FIGURE) ?? []) {
+      if (wired.has(fig)) continue;
+      wired.add(fig);
+      fig.addEventListener('pointerenter', () => enterFigure(fig));
+      fig.addEventListener('pointerleave', () => leaveFigure(fig));
+    }
+  };
 }
 
 export function watchFigureVisibility(frames) {
@@ -50,6 +89,7 @@ export function mountFigures({
   sizeCode = true,
   toggle = true,
   prime = true,
+  hover = true,
   onResize,
 } = {}) {
   const scope = () => (typeof root === 'function' ? root() : root);
@@ -57,6 +97,8 @@ export function mountFigures({
 
   const vis = watchFigureVisibility(frames);
   const stopTheme = watchFigureTheme(frames);
+  const syncHover = hover ? watchFigureHover(scope) : null;
+  syncHover?.();
 
   const onMessage = (e) => {
     const h = e.data && e.data[MSG_HEIGHT];
@@ -66,10 +108,14 @@ export function mountFigures({
       if (f.contentWindow !== e.source) continue;
       pushFigureTheme(f.contentWindow);
       vis.sync();
+      syncHover?.();
 
-      if (h > 0) {
+      // A hover figure is sized by its host, and the height it reports is just that box
+      // measured back — taking it would pin the frame to whatever it happened to start at.
+      const fig = f.closest('.sandbox');
+      if (h > 0 && fig?.dataset.control !== 'hover') {
         f.style.height = h + 'px';
-        if (sizeCode) f.closest('.sandbox')?.style.setProperty('--sandbox-h', h + 'px');
+        if (sizeCode) fig?.style.setProperty('--sandbox-h', h + 'px');
         onResize?.(f, h);
       }
       break;

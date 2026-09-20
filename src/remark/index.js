@@ -88,9 +88,15 @@ export function remarkSandbox({ highlight } = {}) {
         const codeHtml = spec.showCode ? await highlightCode(code, spec.lang) : '';
         const html =
 
-          `<figure class="sandbox" data-mode="preview" data-preset="${spec.preset}" style="--sandbox-h:${spec.h}px">` +
+          `<figure class="sandbox" data-mode="preview" data-preset="${spec.preset}"` +
+          (spec.control ? ` data-control="${spec.control}"` : '') +
+          ` style="--sandbox-h:${spec.h}px;--sandbox-ar:${spec.w}/${spec.h}">` +
 
-          `<div class="sandbox-stage"><iframe class="sandbox-frame" sandbox="allow-scripts" title="interactive ${spec.preset} figure" srcdoc="${srcdoc}"></iframe></div>` +
+          `<div class="sandbox-stage"><iframe class="sandbox-frame" sandbox="allow-scripts" title="interactive ${spec.preset} figure" srcdoc="${srcdoc}"></iframe>` +
+          // A frame swallows the pointer: neither page sees it enter or leave. This catches
+          // it in the host document instead, which is where the hover wiring lives.
+          (spec.control === 'hover' ? `<div class="sandbox-hover" aria-hidden="true"></div>` : '') +
+          `</div>` +
           (spec.showCode
             ? `<div class="sandbox-code">${codeHtml}</div>` +
               `<button class="sandbox-toggle" type="button" title="Show code" aria-label="Show code">${iconSvg('code')}</button>`

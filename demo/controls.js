@@ -1,5 +1,6 @@
 import '@briwa.dev/sandbox/styles';
 import './demo.css';
+import { playFigure, pauseFigure, resetFigure } from '@briwa.dev/sandbox/client';
 import { renderMarkdown } from './render.js';
 
 const WAVE = `loop((t) => {
@@ -18,17 +19,41 @@ const sample = (control) =>
   '```sandbox=js viz 460x150 control=' + control + '\n' + WAVE + '\n```';
 
 const source = `
-## auto (default)
 
-${sample('auto')}
-
-## pausable - starts off paused
+## pausable (default) - starts off paused
 
 ${sample('pausable')}
+
+## auto - runs on its own
+
+${sample('auto')}
 
 ## none - uncontrollable
 
 ${sample('none')}
+
+## hover - runs while pointed at
+
+${sample('hover')}
+
+## manual - the page drives it
+
+Controlled by \`playFigure\`, \`pauseFigure\` and \`resetFigure\` from \`@briwa.dev/sandbox/client\`
+
+${sample('manual')}
 `;
 
-document.querySelector('#controls-prose').innerHTML = await renderMarkdown(source);
+const mount = document.querySelector('#controls-prose');
+mount.innerHTML = await renderMarkdown(source);
+
+const manual = mount.querySelector(".sandbox[data-control='manual']");
+const bar = document.createElement('div');
+bar.className = 'manual-controls';
+for (const [text, action] of [['play', playFigure], ['pause', pauseFigure], ['reset', resetFigure]]) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = text;
+  btn.addEventListener('click', () => action(manual));
+  bar.append(btn);
+}
+manual.after(bar);

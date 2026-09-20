@@ -10,6 +10,12 @@
   background: var(--sbx-surface);
   display: block;
 }
+/* A hover figure fills whatever box the host gives it, so the height it reports back is
+   its own box height — circular. Hold the declared proportions instead. */
+.sandbox[data-control='hover'] .sandbox-frame { height: auto; aspect-ratio: var(--sandbox-ar); }
+.sandbox[data-control='hover'] .sandbox-stage { position: relative; }
+.sandbox-hover { position: absolute; inset: 0; }
+
 .sandbox-code > pre { margin: 0; height: var(--sandbox-h); overflow-y: auto; }
 .sandbox[data-mode='preview'] .sandbox-code { display: none; }
 .sandbox[data-mode='code'] .sandbox-stage { display: none; }
