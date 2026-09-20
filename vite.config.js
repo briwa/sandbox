@@ -24,13 +24,5 @@ export default defineConfig({
   },
   build: {
     outDir: 'demo-dist',
-    rollupOptions: {
-      input: {
-        index: src('index.html'),
-        figures: src('demo/figures.html'),
-        playground: src('demo/playground.html'),
-        editor: src('demo/editor.html'),
-      },
-    },
   },
 });

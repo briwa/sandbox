@@ -252,12 +252,17 @@ existing site. Upload the directory; there is nothing to configure. The only net
 runtime is the Vue runtime a `vue` figure pulls from jsDelivr, and only if such a figure is on the
 page — override it with `configureVueRuntime()` to self-host.
 
-Three pages, importing the package by its public name (the aliases in `vite.config.js` point them
-at `src/`, so edits show up with no package rebuild):
+One page, three tabs, importing the package by its public name (the aliases in `vite.config.js`
+point them at `src/`, so edits show up with no package rebuild):
 
 - **figures** — every block type, rendered from one markdown document
 - **playground** — edit markdown, watch the figures rebuild
 - **editor** — the authoring UI: cards, slash commands, inline previews, the modals
+
+`demo/tabs.js` is the only eager entry. It owns the tab state and reaches each tab's module through
+`import()` on first open, so the editor's ~790 kB of CodeMirror and React stay off the wire until
+someone opens that tab. Inactive panels keep their DOM, so a revisited tab still has its state.
+The tab lives in the hash — `#playground` deep-links.
 
 The first two render markdown *in the browser*, which is the point: the remark plugin is plain
 unified, so the same pipeline a build runs also runs on a page — highlighted by `highlightCode`,
@@ -266,6 +271,33 @@ with no Astro and no Shiki anywhere.
 `demo/editor.jsx` is worth reading if you're integrating: the CodeMirror layer reports Edit/Create
 through callbacks and ships no editing UI of its own, and that file is the ~60 lines that answer
 them with the React modals and splice the result back into the document.
+
+### Deploying the demo
+
+On Cloudflare Pages, connected to the repo:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run demo:build` |
+| Build output directory | `demo-dist` |
+
+Note that it is **not** `npm run build` / `dist` — that pair is the library bundle in
+[Development](#development) below, which emits no HTML. Pages would publish a directory of module
+files and serve a 404 at the root.
+
+`.node-version` pins the build image to Node 22. Vite 8 requires `^20.19.0 || >=22.12.0`, and the
+Pages default is older than that, so without the pin the build fails while installing.
+
+Nothing else is committed for this: no `wrangler.jsonc`, no build config in the repo. Pages holds
+those two settings and builds from source on push, so `demo-dist/` stays gitignored.
+
+To deploy the same directory from a terminal instead, the command is `wrangler pages deploy` —
+`wrangler deploy` on its own is the Workers command and does not apply here:
+
+```
+npm run demo:build
+npx wrangler pages deploy demo-dist --project-name=sandbox
+```
 
 ## Development
 

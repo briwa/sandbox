@@ -33,6 +33,19 @@ h1 {
   margin: 0;
 }
 
+/* One tab's contents. Inactive panels stay in the DOM so a revisited tab keeps its state. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
 h2 {
   font-size: 0.8rem;
   text-transform: uppercase;

@@ -105,7 +105,7 @@ loop((t) => {
 };
 
 const sourceEl = document.querySelector('#source');
-const proseEl = document.querySelector('#prose');
+const proseEl = document.querySelector('#playground-prose');
 const statusEl = document.querySelector('#status');
 const presetEl = document.querySelector('#preset');
 

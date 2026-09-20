@@ -4,7 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>sandbox demos</title>
-    <link rel="stylesheet" href="./demo/demo.css" />
   </head>
   <body>
     <h1>@briwa.dev/sandbox</h1>
@@ -15,16 +14,49 @@
       <code>allow-same-origin</code> &mdash; so it cannot reach the page around it.
     </p>
 
-    <ul>
-      <li><a href="./demo/figures.html">figures</a> &mdash; every block type, rendered from markdown</li>
-      <li><a href="./demo/playground.html">playground</a> &mdash; edit markdown, watch the figures rebuild</li>
-      <li><a href="./demo/editor.html">editor</a> &mdash; the authoring UI: widgets, slash commands, modals</li>
-    </ul>
+    <nav>
+      <a href="#figures" data-tab="figures">figures</a>
+      <a href="#playground" data-tab="playground">playground</a>
+      <a href="#editor" data-tab="editor">editor</a>
+    </nav>
+
+    <section class="panel" id="panel-figures" hidden>
+      <h1>every block type, rendered from markdown</h1>
+      <p class="note">
+        Rendered in the browser by the same remark plugin a build uses, highlighted by
+        <code>highlightCode</code> from <code>@briwa.dev/sandbox/editor</code> &mdash; the Lezer
+        parsers CodeMirror already ships, so no Shiki and no Astro.
+      </p>
+
+      <div class="prose" id="figures-prose"></div>
+    </section>
+
+    <section class="panel" id="panel-playground" hidden>
+      <h1>markdown in, live figures out</h1>
+      <p class="note">Edit the markdown; the figures rebuild as you type.</p>
+
+      <div class="controls">
+        <label for="preset">load</label>
+        <select id="preset"></select>
+        <span id="status"></span>
+      </div>
+
+      <div class="split">
+        <textarea id="source" spellcheck="false" aria-label="Markdown source"></textarea>
+        <div class="prose" id="playground-prose"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-editor" hidden>
+      <div id="app"></div>
+    </section>
 
     <p class="note">
-      These pages import the package by its public name; the aliases in
+      These panels import the package by its public name; the aliases in
       <code>vite.config.js</code> point them at <code>src/</code>, so edits show up without a
       package rebuild.
     </p>
+
+    <script type="module" src="./demo/tabs.js"></script>
   </body>
 </html>

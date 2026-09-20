@@ -183,7 +183,7 @@ raw HTML — are untouched.
 <script>document.title = 'this never runs'</script>
 `;
 
-const mount = document.querySelector('#prose');
+const mount = document.querySelector('#figures-prose');
 mount.innerHTML = await renderMarkdown(source);
 
 mountFigures();
