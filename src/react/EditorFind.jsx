@@ -73,13 +73,13 @@ export default function EditorFind({ viewRef, scopeRef }) {
         {query ? `${info.current}/${info.total}` : ""}
       </span>
       <button className="editor-find-btn" onClick={() => move(-1)} disabled={!info.total} aria-label="Previous match" title="Previous (⇧⏎)">
-        <Icon name="chevronUp" size={15} />
+        <Icon name="chevronUp" size={17} />
       </button>
       <button className="editor-find-btn" onClick={() => move(1)} disabled={!info.total} aria-label="Next match" title="Next (⏎)">
-        <Icon name="chevronDown" size={15} />
+        <Icon name="chevronDown" size={17} />
       </button>
       <button className="editor-find-btn" onClick={close} aria-label="Close find" title="Close (Esc)">
-        <Icon name="close" size={15} />
+        <Icon name="close" size={17} />
       </button>
     </div>
   );

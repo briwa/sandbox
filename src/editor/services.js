@@ -16,6 +16,7 @@ export function codeServices(extraKeys = []) {
   return [
     history(),
     EditorView.lineWrapping,
+    EditorView.theme({ ".cm-content": { caretColor: "currentColor" } }),
     indentUnit.of("  "),
     indentOnInput(),
     closeBrackets(),
