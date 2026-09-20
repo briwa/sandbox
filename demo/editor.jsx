@@ -140,12 +140,6 @@ function Editor() {
 
   return (
     <>
-      <h1>the authoring UI</h1>
-      <p className="note">
-        Cards replace the raw fences. Show preview runs one inline. Edit opens the full modal —
-        code on the left, a live preview on the right, with play/pause/reset and a draggable split.
-        ⌘F finds, ⌘S saves.
-      </p>
       <div className="with-outline">
         <div className="editor" ref={hostRef} />
         <aside className="outline">
@@ -166,11 +160,6 @@ function Editor() {
               ))}
             </ol>
           )}
-          <p className="note">
-            Every row is <code>describeSandboxBlock</code> over a block from{' '}
-            <code>findSandboxBlocks</code> &mdash; <code>label</code> is never empty, so nothing here
-            branches on the kind.
-          </p>
         </aside>
       </div>
 
