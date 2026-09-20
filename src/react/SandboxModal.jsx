@@ -64,7 +64,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [bg, setBg] = useState(seed.bg || "");
   const [showCode, setShowCode] = useState(Boolean(seed.showCode));
   const [control, setControl] = useState(seed.control || "pausable");
-  const [preview, setPreview] = useState(Boolean(seed.preview));
+  const [meta, setMeta] = useState(seed.meta || "");
   const [label, setLabel] = useState(seed.label || "");
 
   const [srcdoc, setSrcdoc] = useState("");
@@ -114,7 +114,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const persist = () => {
     if (!draftKey || clearedRef.current) return;
     const code = cmRef.current ? cmRef.current.state.doc.toString() : (seed.code || "");
-    saveSandboxDraft(draftKey, { lang, viz, w, h, bg, showCode, control, preview, label, code });
+    saveSandboxDraft(draftKey, { lang, viz, w, h, bg, showCode, control, meta, label, code });
   };
   persistRef.current = persist;
   const scheduleSave = () => {
@@ -199,7 +199,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   // wrote a recovery draft for an edit nobody had made. Comparing snapshots
   // instead is indifferent to how many times the effect runs.
   const metaSnapshot = JSON.stringify([lang, viz, w, h, bg, label]);
-  const draftSnapshot = JSON.stringify([lang, viz, w, h, bg, showCode, control, preview, label]);
+  const draftSnapshot = JSON.stringify([lang, viz, w, h, bg, showCode, control, meta, label]);
   const metaSeenRef = useRef(metaSnapshot);
   const draftSeenRef = useRef(draftSnapshot);
 
@@ -299,7 +299,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   function save() {
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     if (isFigure) {
-      const state = { kind: "figure", type: isVue ? "vue" : viz, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, preview, label };
+      const state = { kind: "figure", type: isVue ? "vue" : viz, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, meta, label };
       onSave(buildSandboxFence(state, body), { keepOpen: true });
       updatePreview();
     } else {
@@ -347,12 +347,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
           </label>
           <label className="sbx-field">
             <span>{!isFigure && isVue ? "Component name" : "Label"}</span>
-            <input
-              type="text"
-              placeholder={!isFigure && isVue ? "MyWidget" : "what this is"}
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
+            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
           </label>
           {isFigure && (
             <>
@@ -366,7 +361,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
               </label>
               <label className="sbx-field">
                 <span>Background</span>
-                <input type="text" placeholder="#111 / transparent" value={bg} onChange={(e) => setBg(e.target.value)} />
+                <input type="text" value={bg} onChange={(e) => setBg(e.target.value)} />
               </label>
               {hasControls && (
                 <label className="sbx-field">
@@ -376,9 +371,12 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
                   </select>
                 </label>
               )}
+              <label className="sbx-field">
+                <span>meta</span>
+                <input type="text" value={meta} onChange={(e) => setMeta(e.target.value)} />
+              </label>
               <div className="sbx-toggles">
                 <label className="sbx-check"><input type="checkbox" checked={showCode} onChange={(e) => setShowCode(e.target.checked)} /> show code</label>
-                <label className="sbx-check"><input type="checkbox" checked={preview} onChange={(e) => setPreview(e.target.checked)} /> cover</label>
               </div>
             </>
           )}

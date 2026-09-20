@@ -86,7 +86,7 @@ function Editor() {
       modal: 'sandbox',
       initial: {
         lang: 'js', viz: 'canvas',
-        w: DEFAULT_W, h: DEFAULT_H, bg: '', showCode: false, control: 'pausable', preview: false, label: '', code: '',
+        w: DEFAULT_W, h: DEFAULT_H, bg: '', showCode: false, control: 'pausable', meta: '', label: '', code: '',
       },
     });
   };

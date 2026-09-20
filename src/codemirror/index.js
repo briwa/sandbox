@@ -73,7 +73,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
 
   class SandboxCard extends WidgetType {
     constructor(block, index) { super(); this.block = block; this.index = index; this.name = describeSandboxBlock(block).label; }
-    sig() { const b = this.block; return `${b.from}:${b.to}:${b.lang}:${b.preset}:${b.bg}:${b.showCode}:${b.control}:${b.preview}:${this.name}`; }
+    sig() { const b = this.block; return `${b.from}:${b.to}:${b.lang}:${b.preset}:${b.bg}:${b.showCode}:${b.control}:${b.meta}:${this.name}`; }
     eq(o) { return this.index === o.index && this.sig() === o.sig(); }
     toDOM(view) {
       const b = this.block;

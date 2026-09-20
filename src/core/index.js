@@ -35,7 +35,7 @@ export function specToToolbar(spec = {}) {
     bg: spec.bg || '',
     showCode: Boolean(spec.showCode),
     control: spec.control || 'pausable',
-    preview: Boolean(spec.preview),
+    meta: spec.meta || '',
     label: spec.componentName || spec.label || '',
   };
 }
@@ -111,7 +111,7 @@ export function describeSandboxBlock(spec = {}) {
 
 const metaValue = (v) => (/[\s"]/.test(v) ? `"${escapeAttr(v)}"` : v);
 
-export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode, control, preview, label, componentName }) {
+export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode, control, meta, label, componentName }) {
   if (kind === 'external') return { lang: 'sandbox=external', meta: '' };
 
   const isVue = type === 'vue';
@@ -127,7 +127,7 @@ export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode
   if (bg) tokens.push(`bg=${metaValue(bg)}`);
   if (showCode) tokens.push('code');
   if (control && control !== 'pausable' && !isVue) tokens.push(`control=${control}`);
-  if (preview) tokens.push('preview');
+  if (meta) tokens.push(`meta=${metaValue(meta)}`);
   if (label) tokens.push(`label=${metaValue(label)}`);
   return { lang, meta: tokens.join(' ') };
 }
@@ -190,15 +190,15 @@ export function parseMeta(lang, meta) {
   const [w, h] = size ? size.split('x').map(Number) : [DEFAULT_W, DEFAULT_H];
   const bg = /^[#\w(),.%\s-]+$/.test(values.bg || '') ? values.bg : '';
   const showCode = flags.has('code');
-  const preview = flags.has('preview');
+  const metaText = values.meta || '';
 
-  if (isVue) return { kind: 'figure', lang: 'vue', preset: 'root', w, h, showCode, bg, label, preview };
+  if (isVue) return { kind: 'figure', lang: 'vue', preset: 'root', w, h, showCode, bg, label, meta: metaText };
 
   const preset = PRESETS.has(values.viz) ? values.viz : 'canvas';
   let control = values.control || (flags.has('auto') ? 'auto' : 'pausable');
   if (!CONTROL_MODES.includes(control)) control = 'pausable';
 
-  return { kind: 'figure', lang: 'js', preset, w, h, showCode, bg, control, label, preview };
+  return { kind: 'figure', lang: 'js', preset, w, h, showCode, bg, control, label, meta: metaText };
 }
 
 export function sandboxPrelude(blocks) {
