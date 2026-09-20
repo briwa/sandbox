@@ -48,15 +48,15 @@ loop(() => {
   'groups with id': `Two independent groups. Each figure only sees the \`lib\` blocks tagged with its own
 \`id\`, so \`SHAPE\` means something different on each side.
 
-\`\`\`js lib="left" id="left"
+\`\`\`js lib=left id=left
 const SHAPE = (ctx, x, y) => { ctx.fillRect(x - 9, y - 9, 18, 18); };
 \`\`\`
 
-\`\`\`js lib="right" id="right"
+\`\`\`js lib=right id=right
 const SHAPE = (ctx, x, y) => { ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill(); };
 \`\`\`
 
-\`\`\`js canvas 460x150 control=auto id="left"
+\`\`\`js canvas 460x150 control=auto id=left
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = 'currentColor';
@@ -64,7 +64,7 @@ loop((t) => {
 });
 \`\`\`
 
-\`\`\`js canvas 460x150 control=auto id="right"
+\`\`\`js canvas 460x150 control=auto id=right
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = 'currentColor';
@@ -90,7 +90,7 @@ loop(() => {
   'a background, and no controls': `\`bg\` paints the figure. Without it, a figure follows the page's colour scheme —
 try your OS light/dark switch on the other samples.
 
-\`\`\`js canvas 460x200 bg="#0b1021" control=none
+\`\`\`js canvas 460x200 bg=#0b1021 control=none
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   for (let i = 0; i < 90; i++) {

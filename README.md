@@ -125,20 +125,23 @@ follow the theme, gates animation on visibility so off-screen figures stop burni
 | ```` ```js svg ```` | SVG figure; `svg`, `width`, `height` |
 | ```` ```js root ```` | Bare sized mount point, for a library that owns its container |
 | ```` ```vue ```` | Vue SFC mounted into `#root` |
-| ```` ```js lib="name" ```` | Shared source, concatenated into every figure in the group |
-| ```` ```vue lib="Name" ```` | Shared SFC component, registered globally |
+| ```` ```js lib=name ```` | Shared source, concatenated into every figure in the group |
+| ```` ```vue lib=Name ```` | Shared SFC component, registered globally |
 | ```` ```js external-lib ```` | Body is a list of https `.js` URLs to inject |
 
-Modifiers: `640x360` size · `bg="#111"` background · `code` show-code toggle ·
-`control=pausable|auto|none` playback · `preview` nominate as cover · `label="…"` human name for a
-figure · `id="group"` partition blocks into groups so a figure only pulls its own group's libraries.
+Modifiers: `640x360` size · `bg=#111` background · `code` show-code toggle ·
+`control=pausable|auto|none` playback · `preview` nominate as cover · `label=…` human name for a
+figure · `id=group` partition blocks into groups so a figure only pulls its own group's libraries.
 
-`label` is free text — double quotes and ampersands in it are escaped as `&quot;` / `&amp;` in the
-fence and decoded on the way back. It names a figure for a table of contents or a sidebar. `id`
-stays functional: it partitions groups and is restricted to `[\w-]+`.
+Values are bare: `bg=#111`, `control=none`, `id=hex`, `label=Hexes`. Double quotes are only for a
+value that contains a space — `label="Hex rings"`, `lib="polar helpers"` — and inside them a quote
+or ampersand is escaped as `&quot;` / `&amp;` and decoded on the way back.
+
+`label` is free text; it names a figure for a table of contents or a sidebar. `id` stays functional:
+it partitions groups and is restricted to `[\w-]+`.
 
 Every fence kind reports its name as `label`, so a consumer reads one field. Figures take the
-`label="…"` tag; `lib` and `external-lib` fences already carry a name in the tag itself, and that
+`label=…` tag; `lib` and `external-lib` fences already carry a name in the tag itself, and that
 value *is* their `label`. A `vue lib` fence also keeps `componentName` alongside it — that one is
 functional, the validated tag the component registers under, so a name Vue would reject shows up as
 a `label` with no `componentName`.

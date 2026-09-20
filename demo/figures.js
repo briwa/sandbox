@@ -112,12 +112,12 @@ const btn = { font: 'inherit', fontSize: '20px', width: '38px', height: '38px', 
 
 ## Every block reports a name
 
-A \`lib\` fence is named by its \`lib="…"\` value. When a fence has none, the name falls back to the
+A \`lib\` fence is named by its \`lib=…\` value. When a fence has none, the name falls back to the
 first thing its code declares — the block below is an unnamed \`lib\`, and it still lists as
-\`hexRing\`. Figures take a name from \`label="…"\`; it does not show here, since a rendered figure
+\`hexRing\`. Figures take a name from \`label=…\`; it does not show here, since a rendered figure
 has no header, but it is what an outline or a sidebar lists the figure under.
 
-\`\`\`js lib id="hex"
+\`\`\`js lib id=hex
 const hexRing = (cx, cy, r) =>
   Array.from({ length: 7 }, (_, i) => {
     const a = (i / 6) * Math.PI * 2;
@@ -125,7 +125,7 @@ const hexRing = (cx, cy, r) =>
   });
 \`\`\`
 
-\`\`\`js canvas 480x180 control=auto code label="Hex rings" id="hex"
+\`\`\`js canvas 480x180 control=auto code label="Hex rings" id=hex
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   ctx.strokeStyle = 'currentColor';
@@ -144,11 +144,11 @@ A page for shared source, a page and a globe for source fetched over the network
 for a Vue component. Hover any chip for the word. The \`external-lib\` below sits in a group of its
 own, so no figure on this page loads it.
 
-\`\`\`js external-lib="d3 v7" id="nothing-uses-this"
+\`\`\`js external-lib="d3 v7" id=nothing-uses-this
 https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js
 \`\`\`
 
-\`\`\`vue lib="StatChip" id="chips"
+\`\`\`vue lib=StatChip id=chips
 <template>
   <span :style="chip"><slot /></span>
 </template>
@@ -162,7 +162,7 @@ const chip = {
 </script>
 \`\`\`
 
-\`\`\`vue 480x120 id="chips"
+\`\`\`vue 480x120 id=chips
 <template>
   <div :style="row">
     <StatChip v-for="w in words" :key="w">{{ w }}</StatChip>

@@ -87,17 +87,19 @@ export function describeSandboxBlock(spec = {}) {
   return { kind: 'figure', label, detail: detailOf(label, size, group) };
 }
 
+const metaValue = (v) => (/[\s"]/.test(v) ? `"${escapeAttr(v)}"` : v);
+
 export function serializeSandboxMeta({ type, w, h, bg, showCode, control, preview, label, id }) {
   const lang = type === 'vue' ? 'vue' : 'js';
   const tokens = [];
   if (type !== 'vue') tokens.push(type);
   if (w && h && !(Number(w) === DEFAULT_W && Number(h) === DEFAULT_H)) tokens.push(`${w}x${h}`);
-  if (bg) tokens.push(`bg="${bg}"`);
+  if (bg) tokens.push(`bg=${metaValue(bg)}`);
   if (showCode) tokens.push('code');
   if (control && control !== 'pausable' && type !== 'vue') tokens.push(`control=${control}`);
   if (preview) tokens.push('preview');
-  if (label) tokens.push(`label="${escapeAttr(label)}"`);
-  if (id) tokens.push(`id="${id}"`);
+  if (label) tokens.push(`label=${metaValue(label)}`);
+  if (id) tokens.push(`id=${id}`);
   return { lang, meta: tokens.join(' ') };
 }
 
@@ -109,10 +111,10 @@ export function buildSandboxFence(state, code) {
 
 export function buildLibFence({ kind, label = '', name = '', id = '' }, code = '') {
   let head;
-  if (kind === 'external') head = 'js external-lib' + (label ? `="${label}"` : '');
-  else if (kind === 'vue') head = `vue lib="${name}"`;
-  else head = 'js lib' + (label ? `="${label}"` : '');
-  if (id) head += ` id="${id}"`;
+  if (kind === 'external') head = 'js external-lib' + (label ? `=${metaValue(label)}` : '');
+  else if (kind === 'vue') head = `vue lib=${metaValue(name)}`;
+  else head = 'js lib' + (label ? `=${metaValue(label)}` : '');
+  if (id) head += ` id=${id}`;
   return '```' + head + '\n' + (code || '') + '\n```';
 }
 
@@ -131,61 +133,49 @@ export const unescapeAttr = (s) => s.replace(/&quot;/g, '"').replace(/&amp;/g, '
 export const escapeHtml = (s) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+const META_TOKEN = /([\w-]+)=(?:"([^"]*)"|([^\s"]*))|(\S+)/g;
+
+function tokenizeMeta(meta) {
+  const flags = new Set();
+  const values = {};
+  for (const m of (meta || '').matchAll(META_TOKEN)) {
+    if (m[4] !== undefined) flags.add(m[4]);
+    else values[m[1]] = (m[2] !== undefined ? unescapeAttr(m[2]) : m[3]).trim();
+  }
+  return { flags, values, has: (k) => flags.has(k) || k in values };
+}
+
 export function parseMeta(lang, meta) {
   const isVue = lang === 'vue';
   if (lang !== 'js' && lang !== 'javascript' && !isVue) return null;
-  const raw = (meta || '').trim();
-  const tokens = raw.replace(/([\w-]+)="[^"]*"/g, '$1').split(/\s+/).filter(Boolean);
-  const preset = tokens.find((t) => PRESETS.has(t));
+  const { flags, values, has } = tokenizeMeta(meta);
 
-  const idMatch = /(?:^|\s)id="([^"]*)"/.exec(raw);
-  let id = idMatch ? idMatch[1] : '';
-  if (id && !/^[\w-]+$/.test(id)) id = '';
-
-  const labelMatch = /(?:^|\s)label="([^"]*)"/.exec(raw);
-  const label = labelMatch ? unescapeAttr(labelMatch[1]).trim() : '';
+  const id = /^[\w-]+$/.test(values.id || '') ? values.id : '';
+  const label = values.label || '';
+  const size = [...flags].find((t) => /^\d+x\d+$/.test(t));
+  const [w, h] = size ? size.split('x').map(Number) : [DEFAULT_W, DEFAULT_H];
+  const bg = /^[#\w(),.%\s-]+$/.test(values.bg || '') ? values.bg : '';
+  const showCode = flags.has('code');
+  const preview = flags.has('preview');
 
   if (isVue) {
-
-    const libMatch = /(?:^|\s)lib="([^"]*)"/.exec(raw);
-    if (libMatch || tokens.some((t) => t === 'lib' || t.startsWith('lib='))) {
-      const name = libMatch ? libMatch[1].trim() : '';
-      const component = /^[A-Za-z][\w-]*$/.test(name) ? name : '';
-      return { vue: true, vueLib: true, componentName: component, label: name, id };
+    if (has('lib')) {
+      const name = values.lib || '';
+      const componentName = /^[A-Za-z][\w-]*$/.test(name) ? name : '';
+      return { vue: true, vueLib: true, componentName, label: name, id };
     }
-
-    const vsize = tokens.find((t) => /^\d+x\d+$/.test(t));
-    const [vw, vh] = vsize ? vsize.split('x').map(Number) : [DEFAULT_W, DEFAULT_H];
-    const vbgMatch = /(?:^|\s)bg="([^"]*)"/.exec(raw);
-    let vbg = vbgMatch ? vbgMatch[1] : '';
-    if (vbg && !/^[#\w(),.%\s-]+$/.test(vbg)) vbg = '';
-    return { vue: true, preset: 'root', w: vw, h: vh, showCode: tokens.includes('code'), bg: vbg, label, id, preview: tokens.includes('preview') };
+    return { vue: true, preset: 'root', w, h, showCode, bg, label, id, preview };
   }
 
-  if (!preset && tokens.some((t) => t === 'external-lib' || t.startsWith('external-lib='))) {
-    const m = /(?:^|\s)external-lib="([^"]*)"/.exec(raw);
-    return { external: true, label: m ? m[1].trim() : '', id };
-  }
-
-  if (!preset && tokens.some((t) => t === 'lib' || t.startsWith('lib='))) {
-    const m = /(?:^|\s)lib="([^"]*)"/.exec(raw);
-    return { snippet: true, label: m ? m[1].trim() : '', id };
-  }
+  const preset = [...flags].find((t) => PRESETS.has(t));
+  if (!preset && has('external-lib')) return { external: true, label: values['external-lib'] || '', id };
+  if (!preset && has('lib')) return { snippet: true, label: values.lib || '', id };
   if (!preset) return null;
-  const size = tokens.find((t) => /^\d+x\d+$/.test(t));
-  const [w, h] = size ? size.split('x').map(Number) : [DEFAULT_W, DEFAULT_H];
 
-  const showCode = tokens.includes('code');
-
-  const cm = /(?:^|\s)control="?([a-z]+)"?/.exec(raw);
-  let control = cm ? cm[1] : (tokens.includes('auto') ? 'auto' : 'pausable');
+  let control = values.control || (flags.has('auto') ? 'auto' : 'pausable');
   if (!CONTROL_MODES.includes(control)) control = 'pausable';
 
-  const bgMatch = /(?:^|\s)bg="([^"]*)"/.exec(raw);
-  let bg = bgMatch ? bgMatch[1] : '';
-  if (bg && !/^[#\w(),.%\s-]+$/.test(bg)) bg = '';
-
-  return { preset, w, h, showCode, bg, control, label, id, preview: tokens.includes('preview') };
+  return { preset, w, h, showCode, bg, control, label, id, preview };
 }
 
 export function sandboxPrelude(blocks, groupId = '') {
