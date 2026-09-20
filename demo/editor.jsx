@@ -68,6 +68,7 @@ function Editor() {
   const siblingsNow = () => findSandboxBlocks(viewRef.current?.state.doc.toString() ?? '');
 
   onEditRef.current = (block) => {
+    if (editing && editing.from === block.from) return;
     const base = { from: block.from, to: block.to, siblings: siblingsNow() };
     if (block.snippet) {
       setEditing({ ...base, modal: 'source', initial: { srcLang: 'js', name: block.label, id: block.id, code: block.code } });
@@ -138,59 +139,74 @@ function Editor() {
     else { setEditing(null); view.focus(); }
   }
 
+  const isEditing = (block) =>
+    editing != null && block.from >= editing.from && block.to <= editing.to;
+
   return (
-    <>
-      <div className="with-outline">
+    <div className="with-outline">
+      <div className="editor-pane">
         <div className="editor" ref={hostRef} />
-        <aside className="outline">
-          <h2>outline &mdash; {outline.length}</h2>
-          {outline.length === 0 ? (
-            <p className="note">No sandboxes in this document.</p>
-          ) : (
-            <ol>
-              {outline.map((row) => (
-                <li key={row.block.from}>
+
+        {editing?.modal === 'figure' && (
+          <SandboxModal
+            key={editing.from}
+            kind="figure"
+            variant="inline"
+            initial={editing.initial}
+            siblings={editing.siblings}
+            draftKey={`demo-figure@${editing.from}`}
+            onSave={save}
+            onCancel={() => setEditing(null)}
+          />
+        )}
+        {editing?.modal === 'source' && (
+          <SandboxModal
+            key={editing.from}
+            kind="source"
+            variant="inline"
+            initial={editing.initial}
+            siblings={editing.siblings}
+            draftKey={`demo-source@${editing.from}`}
+            onSave={save}
+            onCancel={() => setEditing(null)}
+          />
+        )}
+        {editing?.modal === 'external' && (
+          <SandboxExternalModal
+            key={editing.from}
+            variant="inline"
+            initial={editing.initial}
+            onSave={save}
+            onCancel={() => setEditing(null)}
+          />
+        )}
+      </div>
+
+      <aside className="outline">
+        <h2>outline &mdash; {outline.length}</h2>
+        {outline.length === 0 ? (
+          <p className="note">No sandboxes in this document.</p>
+        ) : (
+          <ol>
+            {outline.map((row) => {
+              const active = isEditing(row.block);
+              return (
+                <li key={row.block.from} className={active ? 'is-editing' : undefined} aria-current={active || undefined}>
                   <button className="outline-jump" onClick={() => reveal(row)} title="Jump to this block">
                     <span className="outline-kind">{row.kind}</span>
                     <span className="outline-label">{row.label}</span>
                     {row.detail && <span className="outline-detail">{row.detail}</span>}
                   </button>
-                  <button className="outline-edit" onClick={() => onEditRef.current?.(row.block)}>edit</button>
+                  <button className="outline-edit" onClick={() => onEditRef.current?.(row.block)} disabled={active}>
+                    {active ? 'editing' : 'edit'}
+                  </button>
                 </li>
-              ))}
-            </ol>
-          )}
-        </aside>
-      </div>
-
-      {editing?.modal === 'figure' && (
-        <SandboxModal
-          kind="figure"
-          initial={editing.initial}
-          siblings={editing.siblings}
-          draftKey="demo-figure"
-          onSave={save}
-          onCancel={() => setEditing(null)}
-        />
-      )}
-      {editing?.modal === 'source' && (
-        <SandboxModal
-          kind="source"
-          initial={editing.initial}
-          siblings={editing.siblings}
-          draftKey="demo-source"
-          onSave={save}
-          onCancel={() => setEditing(null)}
-        />
-      )}
-      {editing?.modal === 'external' && (
-        <SandboxExternalModal
-          initial={editing.initial}
-          onSave={save}
-          onCancel={() => setEditing(null)}
-        />
-      )}
-    </>
+              );
+            })}
+          </ol>
+        )}
+      </aside>
+    </div>
   );
 }
 

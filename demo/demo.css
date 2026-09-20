@@ -220,9 +220,30 @@ textarea {
   width: 100%;
 }
 
-.with-outline .editor {
+/* variant="inline" anchors the modal here rather than to the viewport. */
+.editor-pane {
+  position: relative;
   flex: 1 1 28rem;
-  width: auto;
+  min-width: 0;
+  min-height: 34rem;
+}
+
+.with-outline .editor {
+  width: 100%;
+}
+
+.editor-pane:has(.sbx-modal, .sbx-overlay) {
+  min-height: 42rem;
+}
+
+.editor-pane .sbx-modal.is-inline,
+.editor-pane .sbx-overlay.is-inline {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.editor-pane .sbx-modal.is-inline {
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
 }
 
 .outline {
@@ -245,6 +266,15 @@ textarea {
 
 .outline li:hover {
   background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.outline li.is-editing {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  box-shadow: inset 2px 0 0 currentColor;
+}
+
+.outline li.is-editing .outline-label {
+  font-weight: 600;
 }
 
 .outline-jump,
@@ -296,6 +326,11 @@ textarea {
 
 .outline li:hover .outline-edit {
   opacity: 0.7;
+}
+
+.outline li.is-editing .outline-edit {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .outline-edit:hover {
