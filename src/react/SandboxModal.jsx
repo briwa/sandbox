@@ -13,7 +13,7 @@ import { loadSandboxDraft, saveSandboxDraft, clearSandboxDraft } from "./storage
 import { targetIdentity } from "./target.js";
 import { getCodeFenceSetting, setCodeFenceSetting } from "./storage.js";
 import {
-  SANDBOX_TYPES,
+  VIZ_SURFACES,
   CONTROL_MODES,
   buildSandboxFence,
   buildSrcdoc,
@@ -27,14 +27,14 @@ const langCompartment = new Compartment();
 
 const langSupport = (name) => (name === "vue" ? vue() : javascript());
 
-function buildPreview({ type, w, h, bg }, code, siblings) {
-  if (type === "vue") {
+function buildPreview({ lang, viz, w, h, bg }, code, siblings) {
+  if (lang === "vue") {
     return buildVueSrcdoc({ w, h, bg }, code, {
       externals: sandboxExternals(siblings),
       components: sandboxVueComponents(siblings),
     });
   }
-  const spec = { preset: type, w, h, bg, control: 'manual' };
+  const spec = { preset: viz, w, h, bg, control: 'manual' };
   return buildSrcdoc(spec, code, sandboxPrelude(siblings), sandboxExternals(siblings));
 }
 
@@ -51,14 +51,14 @@ export default function SandboxModal({ targetKey, initial, draftKey, ...rest }) 
   );
 }
 
-function SandboxEditor({ kind = "figure", variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey }) {
-  const isFigure = kind === "figure";
+function SandboxEditor({ variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey }) {
   const isInline = variant === "inline";
 
   const [restored] = useState(() => (draftKey ? loadSandboxDraft(draftKey) : null));
   const seed = restored ?? initial;
 
-  const [type, setType] = useState(seed.type || "canvas");
+  const [lang, setLang] = useState(seed.lang === "vue" ? "vue" : "js");
+  const [viz, setViz] = useState(seed.viz ?? "canvas");
   const [w, setW] = useState(seed.w || 640);
   const [h, setH] = useState(seed.h || 360);
   const [bg, setBg] = useState(seed.bg || "");
@@ -66,9 +66,6 @@ function SandboxEditor({ kind = "figure", variant = "fixed", className = "", ini
   const [control, setControl] = useState(seed.control || "pausable");
   const [preview, setPreview] = useState(Boolean(seed.preview));
   const [label, setLabel] = useState(seed.label || "");
-
-  const [srcLang, setSrcLang] = useState(seed.srcLang || "js");
-  const [name, setName] = useState(seed.name || "");
 
   const [srcdoc, setSrcdoc] = useState("");
   const [previewW, setPreviewW] = useState(initial.w || 640);
@@ -90,9 +87,16 @@ function SandboxEditor({ kind = "figure", variant = "fixed", className = "", ini
   const persistRef = useRef(null);
   const saveTimer = useRef(null);
 
-  const codeLang = isFigure ? (type === "vue" ? "vue" : "javascript") : (srcLang === "vue" ? "vue" : "javascript");
-  const canPlay = isFigure && type !== "vue";
-  const canReset = isFigure && (type === "canvas" || type === "root");
+  // A block is always js or vue. `viz` is the separate question of whether it is drawn.
+  const isFigure = viz !== "";
+  const isVue = lang === "vue";
+  const codeLang = isVue ? "vue" : "javascript";
+  const canPlay = isFigure && !isVue;
+  const canReset = isFigure && (viz === "canvas" || viz === "root");
+  // Only these two surfaces render playback UI: canvas gets the play button, pause-on-click
+  // and the reset overlay, root gets the play button and reset. svg draws once and vue is
+  // mounted by its own runtime, so `control` has nothing to act on.
+  const hasControls = isFigure && !isVue && (viz === "canvas" || viz === "root");
 
   function updatePreview() {
     if (!isFigure) return;
@@ -100,7 +104,7 @@ function SandboxEditor({ kind = "figure", variant = "fixed", className = "", ini
     const width = Number(w) || 0;
     const height = Number(h) || 0;
 
-    setSrcdoc(buildPreview({ type, w: width, h: height, bg: bg || figureBg() }, body, siblings));
+    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg() }, body, siblings));
     setPreviewW(width || 640);
     setPreviewH(height || 360);
     setFrameKey((k) => k + 1);
@@ -110,7 +114,7 @@ function SandboxEditor({ kind = "figure", variant = "fixed", className = "", ini
   const persist = () => {
     if (!draftKey || clearedRef.current) return;
     const code = cmRef.current ? cmRef.current.state.doc.toString() : (seed.code || "");
-    saveSandboxDraft(draftKey, { type, w, h, bg, showCode, control, preview, label, srcLang, name, code });
+    saveSandboxDraft(draftKey, { lang, viz, w, h, bg, showCode, control, preview, label, code });
   };
   persistRef.current = persist;
   const scheduleSave = () => {
@@ -175,14 +179,27 @@ function SandboxEditor({ kind = "figure", variant = "fixed", className = "", ini
     if (cmRef.current) cmRef.current.dispatch({ effects: langCompartment.reconfigure(langSupport(codeLang)) });
   }, [codeLang]);
 
+  // Switching to vue narrows the surfaces to `root`, so a js-only choice cannot linger.
+  useEffect(() => {
+    if (viz && !VIZ_SURFACES[lang].includes(viz)) setViz(VIZ_SURFACES[lang][0]);
+  }, [lang, viz]);
+
+  // Turning visualization on should show something, not an empty pane.
+  const vizSeenRef = useRef(viz);
+  useEffect(() => {
+    const was = vizSeenRef.current;
+    vizSeenRef.current = viz;
+    if (viz && viz !== was) updatePreview();
+  }, [viz]);
+
   // Both effects below react to a *change* in the toolbar values, and both used
   // to detect one by skipping their first run. That miscounts: StrictMode mounts,
   // unmounts and remounts in development, the refs survive it, and the second run
   // fell straight through the guard — so every modal opened already dirty and
   // wrote a recovery draft for an edit nobody had made. Comparing snapshots
   // instead is indifferent to how many times the effect runs.
-  const metaSnapshot = JSON.stringify([type, w, h, bg, label, srcLang, name]);
-  const draftSnapshot = JSON.stringify([type, w, h, bg, showCode, control, preview, label, srcLang, name]);
+  const metaSnapshot = JSON.stringify([lang, viz, w, h, bg, label]);
+  const draftSnapshot = JSON.stringify([lang, viz, w, h, bg, showCode, control, preview, label]);
   const metaSeenRef = useRef(metaSnapshot);
   const draftSeenRef = useRef(draftSnapshot);
 
@@ -282,15 +299,12 @@ function SandboxEditor({ kind = "figure", variant = "fixed", className = "", ini
   function save() {
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     if (isFigure) {
-      const state = { kind: "figure", type, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, preview, label };
+      const state = { kind: "figure", type: isVue ? "vue" : viz, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, preview, label };
       onSave(buildSandboxFence(state, body), { keepOpen: true });
       updatePreview();
     } else {
       finishDraft();
-      const state = srcLang === "vue"
-        ? { kind: "source", type: "vue", componentName: name }
-        : { kind: "source", type: "js", label: name };
-      onSave(buildSandboxFence(state, body));
+      onSave(buildSandboxFence({ kind: "source", type: lang, label }, body));
     }
   }
   saveRef.current = save;
@@ -308,25 +322,40 @@ function SandboxEditor({ kind = "figure", variant = "fixed", className = "", ini
     return true;
   };
 
-  const isVue = type === "vue";
-
   return (
     <div
       className={["sbx-modal", isInline ? "is-inline" : "", className].filter(Boolean).join(" ")}
       role="dialog"
       aria-modal={isInline ? undefined : "true"}
-      aria-label={isFigure ? "Edit sandbox figure" : "Edit shared library"}
+      aria-label={isFigure ? "Edit sandbox figure" : "Edit shared source"}
     >
       <div className="sbx-head">
         <div className="sbx-toolbar">
-          {isFigure ? (
+          <label className="sbx-field">
+            <span>Language</span>
+            <select value={lang} onChange={(e) => setLang(e.target.value)}>
+              <option value="js">js</option>
+              <option value="vue">vue</option>
+            </select>
+          </label>
+          <label className="sbx-field">
+            <span>Visualize</span>
+            <select value={viz} onChange={(e) => setViz(e.target.value)}>
+              <option value="">no &mdash; shared source</option>
+              {VIZ_SURFACES[lang].map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
+          <label className="sbx-field">
+            <span>{!isFigure && isVue ? "Component name" : "Label"}</span>
+            <input
+              type="text"
+              placeholder={!isFigure && isVue ? "MyWidget" : "what this is"}
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          </label>
+          {isFigure && (
             <>
-              <label className="sbx-field">
-                <span>Type</span>
-                <select value={type} onChange={(e) => setType(e.target.value)}>
-                  {SANDBOX_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </label>
               <label className="sbx-field">
                 <span>Size</span>
                 <span className="sbx-size">
@@ -339,11 +368,7 @@ function SandboxEditor({ kind = "figure", variant = "fixed", className = "", ini
                 <span>Background</span>
                 <input type="text" placeholder="#111 / transparent" value={bg} onChange={(e) => setBg(e.target.value)} />
               </label>
-              <label className="sbx-field">
-                <span>Label</span>
-                <input type="text" placeholder="what this is" value={label} onChange={(e) => setLabel(e.target.value)} />
-              </label>
-              {!isVue && (
+              {hasControls && (
                 <label className="sbx-field">
                   <span>Controls</span>
                   <select value={control} onChange={(e) => setControl(e.target.value)}>
@@ -355,25 +380,6 @@ function SandboxEditor({ kind = "figure", variant = "fixed", className = "", ini
                 <label className="sbx-check"><input type="checkbox" checked={showCode} onChange={(e) => setShowCode(e.target.checked)} /> show code</label>
                 <label className="sbx-check"><input type="checkbox" checked={preview} onChange={(e) => setPreview(e.target.checked)} /> cover</label>
               </div>
-            </>
-          ) : (
-            <>
-              <label className="sbx-field">
-                <span>Language</span>
-                <select value={srcLang} onChange={(e) => setSrcLang(e.target.value)}>
-                  <option value="js">js source</option>
-                  <option value="vue">vue component</option>
-                </select>
-              </label>
-              <label className="sbx-field">
-                <span>{srcLang === "vue" ? "Component name" : "Label"}</span>
-                <input
-                  type="text"
-                  placeholder={srcLang === "vue" ? "MyWidget" : "what this is"}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </label>
             </>
           )}
         </div>

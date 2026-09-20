@@ -65,34 +65,30 @@ function Editor() {
   const onEditRef = useRef(null);
   const onCreateRef = useRef(null);
 
-  const siblingsNow = () => findSandboxBlocks(viewRef.current?.state.doc.toString() ?? '');
+  // Everything in the document except the block being edited — a block must not be its own
+  // sibling, or visualizing a source block would run its code as both prelude and body.
+  const siblingsNow = (self) =>
+    findSandboxBlocks(viewRef.current?.state.doc.toString() ?? '')
+      .filter((b) => b.from !== self?.from);
 
   onEditRef.current = (block) => {
     if (editing && editing.from === block.from) return;
-    const base = { from: block.from, to: block.to, siblings: siblingsNow() };
-    if (block.kind === 'external') {
-      setEditing({ ...base, modal: 'external', initial: { code: block.code } });
-    } else if (block.kind === 'source') {
-      const name = block.lang === 'vue' ? block.componentName : block.label;
-      setEditing({ ...base, modal: 'source', initial: { srcLang: block.lang, name, code: block.code } });
-    } else {
-      setEditing({ ...base, modal: 'figure', initial: { ...specToToolbar(block), code: block.code } });
-    }
+    const base = { from: block.from, to: block.to, siblings: siblingsNow(block) };
+    if (block.kind === 'external') setEditing({ ...base, modal: 'external', initial: { code: block.code } });
+    else setEditing({ ...base, modal: 'sandbox', initial: { ...specToToolbar(block), code: block.code } });
   };
 
   onCreateRef.current = (kind, pos) => {
     const base = { from: pos, to: pos, siblings: siblingsNow() };
-    if (kind === 'external') {
-      setEditing({ ...base, modal: 'external', initial: { code: '' } });
-    } else if (kind === 'source') {
-      setEditing({ ...base, modal: 'source', initial: { srcLang: 'js', name: '', code: '' } });
-    } else {
-      setEditing({
-        ...base,
-        modal: 'figure',
-        initial: { type: 'canvas', w: DEFAULT_W, h: DEFAULT_H, bg: '', showCode: false, control: 'pausable', preview: false, label: '', code: '' },
-      });
-    }
+    if (kind === 'external') return setEditing({ ...base, modal: 'external', initial: { code: '' } });
+    setEditing({
+      ...base,
+      modal: 'sandbox',
+      initial: {
+        lang: 'js', viz: 'canvas',
+        w: DEFAULT_W, h: DEFAULT_H, bg: '', showCode: false, control: 'pausable', preview: false, label: '', code: '',
+      },
+    });
   };
 
   useEffect(() => {
@@ -146,26 +142,13 @@ function Editor() {
       <div className="editor-pane">
         <div className="editor" ref={hostRef} />
 
-        {editing?.modal === 'figure' && (
+        {editing?.modal === 'sandbox' && (
           <SandboxModal
-            kind="figure"
             variant="inline"
             targetKey={editing.from}
             initial={editing.initial}
             siblings={editing.siblings}
-            draftKey="demo-figure"
-            onSave={save}
-            onCancel={() => setEditing(null)}
-          />
-        )}
-        {editing?.modal === 'source' && (
-          <SandboxModal
-            kind="source"
-            variant="inline"
-            targetKey={editing.from}
-            initial={editing.initial}
-            siblings={editing.siblings}
-            draftKey="demo-source"
+            draftKey="demo-sandbox"
             onSave={save}
             onCancel={() => setEditing(null)}
           />

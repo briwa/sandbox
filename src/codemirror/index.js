@@ -216,7 +216,8 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
     }
   );
 
-  const COMMANDS = { '/sandbox': 'figure', '/sandbox-source': 'source', '/sandbox-external': 'external' };
+  // Two commands is the whole surface: language and viz are picked in the modal.
+  const COMMANDS = { '/sandbox': 'figure', '/sandbox-external': 'external' };
   const slashCommand = Prec.high(keymap.of([{
     key: 'Enter',
     run(view) {
@@ -232,8 +233,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
   }]));
 
   const SLASH_OPTIONS = [
-    { label: '/sandbox', kind: 'figure', detail: 'interactive figure' },
-    { label: '/sandbox-source', kind: 'source', detail: 'shared source' },
+    { label: '/sandbox', kind: 'figure', detail: 'figure or shared source' },
     { label: '/sandbox-external', kind: 'external', detail: 'external library' },
   ];
   const slashComplete = autocompletion({

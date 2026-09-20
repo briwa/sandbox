@@ -18,25 +18,30 @@ const VIS_GATE =
   `addEventListener('visibilitychange',()=>{__gVis=!document.hidden;__wake()});` +
   `addEventListener('message',(e)=>{if(e.data&&'__figvis'in e.data){__gHost=!!e.data.__figvis;__wake()}});`;
 
-export const SANDBOX_TYPES = ['canvas', 'svg', 'root', 'vue'];
-
 // Who drives playback. The last two hand that job to the host page: `manual` waits for
 // play/pause/reset messages, `hover` runs only while the host says the pointer is on it.
 export const CONTROL_MODES = ['pausable', 'auto', 'none', 'manual', 'hover'];
 export { DEFAULT_W, DEFAULT_H };
 
+// The two axes an author actually picks: the language, and whether it is visualized.
+// `viz: ''` is a shared-source block; anything else is a figure on that surface.
 export function specToToolbar(spec = {}) {
+  const lang = spec.lang === 'vue' ? 'vue' : 'js';
   return {
-    type: spec.lang === 'vue' ? 'vue' : (spec.preset || 'canvas'),
+    lang,
+    viz: spec.kind === 'figure' ? (lang === 'vue' ? 'root' : spec.preset || 'canvas') : '',
     w: spec.w || DEFAULT_W,
     h: spec.h || DEFAULT_H,
     bg: spec.bg || '',
     showCode: Boolean(spec.showCode),
     control: spec.control || 'pausable',
     preview: Boolean(spec.preview),
-    label: spec.label || '',
+    label: spec.componentName || spec.label || '',
   };
 }
+
+// What `viz` can be set to for a language: vue only ever mounts into a root.
+export const VIZ_SURFACES = { js: ['canvas', 'svg', 'root'], vue: ['root'] };
 
 const DECLARATIONS = [
   /^(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/,
