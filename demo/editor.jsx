@@ -90,7 +90,7 @@ function Editor() {
       setEditing({
         ...base,
         modal: 'figure',
-        initial: { type: 'canvas', w: DEFAULT_W, h: DEFAULT_H, bg: '', showCode: false, control: 'pausable', preview: false, label: '', id: '', code: '// your code' },
+        initial: { type: 'canvas', w: DEFAULT_W, h: DEFAULT_H, bg: '', showCode: false, control: 'pausable', preview: false, label: '', id: '', code: '' },
       });
     }
   };
