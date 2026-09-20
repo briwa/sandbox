@@ -1,3 +1,5 @@
+const CODE_GLYPH = '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>';
+
 export const ICONS = {
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
   close: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -13,11 +15,18 @@ export const ICONS = {
   trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
   file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
   globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
-  js: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  js: CODE_GLYPH,
+  code: CODE_GLYPH,
   vue: '<path d="M3 4h4l5 9 5-9h4L12 21 3 4z"/>',
   canvas: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
   svg: '<path d="M4 17c6 0 10-10 16-10"/><circle cx="4" cy="17" r="2"/><circle cx="20" cy="7" r="2"/>',
   root: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="2"/>',
+};
+
+export const KIND_ICONS = {
+  snippet: [['file', 'lib']],
+  external: [['file', 'lib'], ['globe', 'external']],
+  'vue-lib': [['file', 'lib'], ['vue', 'vue']],
 };
 
 export const iconSvg = (name, size = 15) =>

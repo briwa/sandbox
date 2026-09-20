@@ -1,5 +1,6 @@
 import {
   parseMeta,
+  describeSandboxBlock,
   buildSrcdoc,
   buildVueSrcdoc,
   sandboxPrelude,
@@ -9,6 +10,14 @@ import {
   escapeAttr,
   escapeHtml,
 } from '../core/index.js';
+import { iconSvg, KIND_ICONS } from '../core/icons.js';
+
+const libSummary = (kind, label) =>
+  `<summary><span class="sandbox-lib-label">${escapeHtml(label)}</span>` +
+  (KIND_ICONS[kind] ?? KIND_ICONS.snippet)
+    .map(([icon, title]) => `<span class="sandbox-lib-tag" title="${title}" aria-label="${title}">${iconSvg(icon, 13)}</span>`)
+    .join('') +
+  `</summary>`;
 
 const plainHighlight = (code) => `<pre class="astro-code"><code>${escapeHtml(code)}</code></pre>`;
 
@@ -46,12 +55,11 @@ export function remarkSandbox({ highlight } = {}) {
 
         if (spec.snippet) {
           const libHtml = await highlightCode(code);
-          const label = spec.label || 'Click to see the code';
           parent.children[index] = {
             type: 'html',
             value:
               `<details class="sandbox sandbox-lib">` +
-              `<summary><span class="sandbox-lib-tag">lib</span><span class="sandbox-lib-label">${escapeHtml(label)}</span></summary>` +
+              libSummary('snippet', describeSandboxBlock({ ...spec, code }).label) +
               `${libHtml}</details>`,
           };
           return;
@@ -59,7 +67,6 @@ export function remarkSandbox({ highlight } = {}) {
 
         if (spec.external) {
           const urls = (code || '').split(/\s+/).map(safeUrl).filter(Boolean);
-          const label = spec.label || 'External library';
           const body = urls.length
             ? urls
                 .map(
@@ -72,7 +79,7 @@ export function remarkSandbox({ highlight } = {}) {
             type: 'html',
             value:
               `<details class="sandbox sandbox-lib sandbox-external">` +
-              `<summary><span class="sandbox-lib-tag">external-lib</span><span class="sandbox-lib-label">${escapeHtml(label)}</span></summary>` +
+              libSummary('external', describeSandboxBlock({ ...spec, code }).label) +
               `<div class="sandbox-external-urls">${body}</div></details>`,
           };
           return;
@@ -80,12 +87,11 @@ export function remarkSandbox({ highlight } = {}) {
 
         if (spec.vueLib) {
           const libHtml = await highlightCode(code, 'vue');
-          const label = spec.label || 'Vue component';
           parent.children[index] = {
             type: 'html',
             value:
               `<details class="sandbox sandbox-lib">` +
-              `<summary><span class="sandbox-lib-tag">vue lib</span><span class="sandbox-lib-label">${escapeHtml(label)}</span></summary>` +
+              libSummary('vue-lib', describeSandboxBlock({ ...spec, code }).label) +
               `${libHtml}</details>`,
           };
           return;
@@ -105,7 +111,7 @@ export function remarkSandbox({ highlight } = {}) {
           `<div class="sandbox-stage"><iframe class="sandbox-frame" sandbox="allow-scripts" title="interactive ${spec.preset} figure" srcdoc="${srcdoc}"></iframe></div>` +
           (spec.showCode
             ? `<div class="sandbox-code">${codeHtml}</div>` +
-              `<button class="sandbox-toggle" type="button">Show code</button>`
+              `<button class="sandbox-toggle" type="button" title="Show code" aria-label="Show code">${iconSvg('code')}</button>`
             : '') +
           `</figure>`;
         parent.children[index] = { type: 'html', value: html };

@@ -38,9 +38,9 @@ export function specToToolbar(spec = {}) {
 }
 
 const DECLARATIONS = [
-  /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/,
-  /^\s*(?:export\s+(?:default\s+)?)?class\s+([A-Za-z_$][\w$]*)/,
-  /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:function\b|\(|[A-Za-z_$][\w$]*\s*=>)/,
+  /^(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/,
+  /^(?:export\s+(?:default\s+)?)?class\s+([A-Za-z_$][\w$]*)/,
+  /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/,
 ];
 
 const firstDeclaration = (code) => {

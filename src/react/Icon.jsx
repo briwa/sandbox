@@ -1,4 +1,4 @@
-import { ICONS } from '../editor/icons.js';
+import { ICONS } from '../core/icons.js';
 
 export default function Icon({ name, size = 18, ...rest }) {
   return (

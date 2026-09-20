@@ -50,8 +50,8 @@
   font-family: var(--sbx-mono);
   font-size: 0.7rem;
   line-height: 1;
-  color: var(--sbx-muted);
-  border: 1px solid var(--sbx-rule);
+  color: var(--sbx-surface);
+  background: var(--sbx-muted);
   border-radius: 4px;
   padding: 0.22rem 0.42rem;
 }

@@ -25,8 +25,9 @@ loop((t) => {
 
 ## control=auto, and show the code
 
-\`auto\` runs on load instead of waiting for a press. \`code\` adds the Show-code toggle — the
-source pane is capped to the figure's own height so toggling never resizes the page.
+\`auto\` runs on load instead of waiting for a press. \`code\` adds the toggle in the top-right
+corner — the eye swaps between the figure and its source, and the source pane is capped to the
+figure's own height so toggling never resizes the page.
 
 \`\`\`js canvas 480x180 control=auto code
 loop((t) => {
@@ -106,6 +107,70 @@ import { ref } from 'vue';
 const n = ref(0);
 const box = { display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'center', height: '100%', font: '600 15px system-ui' };
 const btn = { font: 'inherit', fontSize: '20px', width: '38px', height: '38px', borderRadius: '8px', border: '1px solid currentColor', background: 'none', color: 'inherit', cursor: 'pointer' };
+</script>
+\`\`\`
+
+## Every block reports a name
+
+A \`lib\` fence is named by its \`lib="…"\` value. When a fence has none, the name falls back to the
+first thing its code declares — the block below is an unnamed \`lib\`, and it still lists as
+\`hexRing\`. Figures take a name from \`label="…"\`; it does not show here, since a rendered figure
+has no header, but it is what an outline or a sidebar lists the figure under.
+
+\`\`\`js lib id="hex"
+const hexRing = (cx, cy, r) =>
+  Array.from({ length: 7 }, (_, i) => {
+    const a = (i / 6) * Math.PI * 2;
+    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+  });
+\`\`\`
+
+\`\`\`js canvas 480x180 control=auto code label="Hex rings" id="hex"
+loop((t) => {
+  ctx.clearRect(0, 0, width, height);
+  ctx.strokeStyle = 'currentColor';
+  for (let k = 0; k < 5; k++) {
+    ctx.beginPath();
+    hexRing(width / 2, height / 2, 22 + k * 15 + Math.sin(t / 900 + k) * 5)
+      .forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.stroke();
+  }
+});
+\`\`\`
+
+## The chip says what kind of block it is
+
+A page for shared source, a page and a globe for source fetched over the network, a page and a V
+for a Vue component. Hover any chip for the word. The \`external-lib\` below sits in a group of its
+own, so no figure on this page loads it.
+
+\`\`\`js external-lib="d3 v7" id="nothing-uses-this"
+https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js
+\`\`\`
+
+\`\`\`vue lib="StatChip" id="chips"
+<template>
+  <span :style="chip"><slot /></span>
+</template>
+<script setup>
+const chip = {
+  font: '600 13px system-ui',
+  padding: '6px 12px',
+  borderRadius: '999px',
+  border: '1px solid currentColor',
+};
+</script>
+\`\`\`
+
+\`\`\`vue 480x120 id="chips"
+<template>
+  <div :style="row">
+    <StatChip v-for="w in words" :key="w">{{ w }}</StatChip>
+  </div>
+</template>
+<script setup>
+const words = ['lib', 'external', 'vue'];
+const row = { display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center', height: '100%' };
 </script>
 \`\`\`
 

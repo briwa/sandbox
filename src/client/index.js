@@ -1,4 +1,5 @@
 import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE } from '../core/protocol.js';
+import { iconSvg } from '../core/icons.js';
 
 let bgVar = '--bg';
 
@@ -89,7 +90,10 @@ export function mountFigures({
     if (!fig) return;
     const showingCode = fig.getAttribute('data-mode') === 'code';
     fig.setAttribute('data-mode', showingCode ? 'preview' : 'code');
-    btn.textContent = showingCode ? 'Show code' : 'Show preview';
+    const label = showingCode ? 'Show code' : 'Show preview';
+    btn.innerHTML = iconSvg(showingCode ? 'code' : 'eye');
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
   };
   if (toggle) document.addEventListener('click', onToggle);
 

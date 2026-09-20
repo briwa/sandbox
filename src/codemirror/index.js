@@ -11,13 +11,7 @@ import {
   sandboxVueComponents,
 } from '../core/index.js';
 import { mountFigures } from '../client/index.js';
-import { iconSvg } from '../editor/icons.js';
-
-const LIB_CHIPS = {
-  lib: [['file', 'lib']],
-  'external-lib': [['file', 'lib'], ['globe', 'external']],
-  'vue lib': [['file', 'lib'], ['vue', 'vue']],
-};
+import { iconSvg, KIND_ICONS } from '../core/icons.js';
 
 function iconChip(name, title) {
   const chip = document.createElement('span');
@@ -115,8 +109,8 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
   }
 
   class LibCard extends WidgetType {
-    constructor(block, index, tag, label) { super(); this.block = block; this.index = index; this.tag = tag; this.label = label; }
-    eq(o) { return this.index === o.index && this.tag === o.tag && this.label === o.label && this.block.from === o.block.from && this.block.to === o.block.to; }
+    constructor(block, index, kind, label) { super(); this.block = block; this.index = index; this.kind = kind; this.label = label; }
+    eq(o) { return this.index === o.index && this.kind === o.kind && this.label === o.label && this.block.from === o.block.from && this.block.to === o.block.to; }
     toDOM(view) {
       const card = document.createElement('div');
       card.className = 'cm-sbx-card';
@@ -129,7 +123,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
         lbl.title = this.label;
         chips.appendChild(lbl);
       }
-      for (const [icon, title] of LIB_CHIPS[this.tag] ?? LIB_CHIPS.lib) chips.appendChild(iconChip(icon, title));
+      for (const [icon, title] of KIND_ICONS[this.kind] ?? KIND_ICONS.snippet) chips.appendChild(iconChip(icon, title));
       const actions = document.createElement('div');
       actions.className = 'cm-sbx-actions';
       actions.append(...editRemove(view, this.block));
@@ -180,11 +174,11 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       if (!b.closed) return;
       const replace = (widget) => ranges.push(Decoration.replace({ widget, block: true }).range(b.from, b.to));
       if (b.snippet) {
-        replace(new LibCard(b, i, 'lib', describeSandboxBlock(b).label));
+        replace(new LibCard(b, i, 'snippet', describeSandboxBlock(b).label));
       } else if (b.external) {
-        replace(new LibCard(b, i, 'external-lib', describeSandboxBlock(b).label));
+        replace(new LibCard(b, i, 'external', describeSandboxBlock(b).label));
       } else if (b.vueLib) {
-        replace(new LibCard(b, i, 'vue lib', describeSandboxBlock(b).label));
+        replace(new LibCard(b, i, 'vue-lib', describeSandboxBlock(b).label));
       } else if (previews.has(i)) {
 
         const externals = sandboxExternals(blocks, b.id);

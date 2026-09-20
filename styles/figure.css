@@ -17,17 +17,16 @@
   position: absolute;
   top: 0.4rem;
   right: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--sbx-surface);
   cursor: pointer;
-  font-family: inherit;
-  font-size: 0.7rem;
   line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--sbx-muted);
   border: 1px solid var(--sbx-rule);
   border-radius: 4px;
-  padding: 0.25rem 0.5rem;
+  padding: 0.3rem;
 }
 .sandbox-toggle:hover { color: var(--sbx-ink); }
 
@@ -51,17 +50,21 @@
 }
 .sandbox-lib[open] > summary::before { transform: rotate(90deg); }
 .sandbox-lib > summary:hover { color: var(--sbx-ink); }
-.sandbox-lib > summary:hover .sandbox-lib-tag { color: var(--sbx-ink); }
+.sandbox-lib > summary:hover .sandbox-lib-tag { background: var(--sbx-ink); }
 .sandbox-lib > pre { margin: 0.6rem 0 0; }
 .sandbox-lib-tag {
-  font-size: 0.7rem;
+  display: inline-flex;
+  align-items: center;
   line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--sbx-muted);
-  border: 1px solid var(--sbx-rule);
+  color: var(--sbx-surface);
+  background: var(--sbx-muted);
   border-radius: 4px;
-  padding: 0.25rem 0.5rem;
+  padding: 0.22rem 0.28rem;
+}
+.sandbox-lib-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sandbox-external-urls {
