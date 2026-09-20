@@ -2,21 +2,38 @@ import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon.jsx";
 import { setFind, moveFind, clearFind, findInfo } from "../editor/find.js";
 
+// Marks the region a find bar searches within. Bars nest — the fence editor's
+// sits inside the surrounding page editor's — so ownership of the keystroke
+// cannot be "my scope contains the focus": both would say yes. It is the
+// innermost mark around the focus that owns it, which is the editor being typed
+// in. A bar carries the mark too, so typing into one does not read as focus in
+// the editor around it.
+const SCOPE = "data-find-scope";
+
 export default function EditorFind({ viewRef, scopeRef }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [info, setInfo] = useState({ current: 0, total: 0 });
   const inputRef = useRef(null);
+  const barRef = useRef(null);
 
   const refresh = () => { const v = viewRef.current; if (v) setInfo(findInfo(v)); };
 
   useEffect(() => { if (open) { inputRef.current?.focus(); inputRef.current?.select(); } }, [open]);
   const move = (dir) => { const v = viewRef.current; if (v) { moveFind(v, dir); refresh(); } };
-  const close = () => {
+  // Closing for a nested bar leaves the focus where it is: the caret is already
+  // in the inner editor, and pulling it back out is the fight this avoids.
+  const close = ({ refocus = true } = {}) => {
     setOpen(false);
     const v = viewRef.current;
-    if (v) { clearFind(v); v.focus(); }
+    if (v) { clearFind(v); if (refocus) v.focus(); }
   };
+
+  useEffect(() => {
+    const els = [scopeRef?.current, barRef.current].filter(Boolean);
+    for (const el of els) el.setAttribute(SCOPE, "");
+    return () => { for (const el of els) el.removeAttribute(SCOPE); };
+  }, [open]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -24,8 +41,17 @@ export default function EditorFind({ viewRef, scopeRef }) {
       const inBar = bar && document.activeElement === bar;
       if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "F")) {
         const v = viewRef.current;
-        const inScope = scopeRef?.current?.contains(document.activeElement);
-        if (!open && !inScope && !inBar) return;
+        const scope = scopeRef?.current;
+        const owner = document.activeElement?.closest?.(`[${SCOPE}]`) ?? null;
+        const mine = inBar || (!!scope && owner === scope);
+        if (!mine) {
+          // Another editor has the focus, so the keystroke is its bar's. This
+          // one stands down instead of leaving its matches lit in a document
+          // nobody is searching any more — one find at a time, wherever the
+          // caret is.
+          if (open) close({ refocus: false });
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         setOpen(true);
@@ -59,7 +85,7 @@ export default function EditorFind({ viewRef, scopeRef }) {
   };
 
   return (
-    <div className="editor-find" role="search">
+    <div className="editor-find" role="search" ref={barRef}>
       <input
         ref={inputRef}
         className="editor-find-input"

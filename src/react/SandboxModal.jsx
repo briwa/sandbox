@@ -78,6 +78,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [split, setSplit] = useState(() => getCodeFenceSetting("splitRatio", 0.5));
   const [dragging, setDragging] = useState(false);
 
+  const modalRef = useRef(null);
   const bodyRef = useRef(null);
   const hostRef = useRef(null);
   const cmRef = useRef(null);
@@ -324,6 +325,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
 
   return (
     <div
+      ref={modalRef}
       className={["sbx-modal", isInline ? "is-inline" : "", className].filter(Boolean).join(" ")}
       role="dialog"
       aria-modal={isInline ? undefined : "true"}
@@ -399,7 +401,11 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
       >
         <div className="sbx-code-pane">
           <div className="sbx-code" ref={hostRef} />
-          <EditorFind viewRef={cmRef} scopeRef={hostRef} />
+          {/* The scope is the whole fence editor, not just the code host:
+              ⌘F from its toolbar means the code in front of you, and the page
+              editor behind it has a find bar of its own that would otherwise
+              answer the same keystroke. */}
+          <EditorFind viewRef={cmRef} scopeRef={modalRef} />
           {isFigure && dirty && (
             <button
               className="sbx-save-fab"
