@@ -159,6 +159,39 @@ may be empty. An `external-lib` whose name is a raw-gist URL is trimmed to its f
 
 An ordinary ```` ```js ```` fence with no preset passes straight through to your normal highlighter.
 
+## The authoring UI
+
+`SandboxModal` and `SandboxExternalModal` cover the viewport by default — `position: fixed`, the
+page behind them scroll-locked, `aria-modal="true"`. A host that already has an editor layout
+usually wants them filling one pane of it instead. That is `variant="inline"`:
+
+```jsx
+/* the container the panel should fill — any positioned element */
+<div className="editor-main">
+  <MyEditor />
+  {editing && (
+    <SandboxModal
+      variant="inline"
+      kind="figure"
+      initial={editing.initial}
+      siblings={editing.siblings}
+      onSave={save}
+      onCancel={() => setEditing(null)}
+    />
+  )}
+</div>
+```
+
+Inline drops the three things that only make sense full-screen: it positions `absolute` rather than
+`fixed`, leaves `document.body` scrolling alone, and omits `aria-modal` — the rest of your app is
+still reachable, so claiming otherwise would lie to a screen reader. **The container must establish
+a containing block** (`position: relative` is enough); with none, `inset: 0` climbs to the next
+positioned ancestor and the panel covers more than you meant.
+
+Everything else is unchanged, including `draftKey` recovery and the shortcuts: ⌘S saves, ⌘F finds,
+Esc closes once there is nothing unsaved. `className` is appended to the root if you need a handle
+of your own, and both components take the same two props.
+
 ## Styling
 
 ```js

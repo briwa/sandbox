@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon.jsx";
 import { buildLibFence, safeUrl } from "../core/index.js";
 
-export default function SandboxExternalModal({ initial, onSave, onCancel }) {
+export default function SandboxExternalModal({ variant = "fixed", className = "", initial, onSave, onCancel }) {
   const [urls, setUrls] = useState(initial.code || "");
   const [label, setLabel] = useState(initial.label || "");
   const [groupId, setGroupId] = useState(initial.id || "");
@@ -23,8 +23,11 @@ export default function SandboxExternalModal({ initial, onSave, onCancel }) {
   }
 
   return (
-    <div className="sbx-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="sbx-dialog" role="dialog" aria-modal="true" aria-label="External library">
+    <div
+      className={["sbx-overlay", variant === "inline" ? "is-inline" : "", className].filter(Boolean).join(" ")}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="sbx-dialog" role="dialog" aria-modal={variant === "inline" ? undefined : "true"} aria-label="External library">
         <h2 className="sbx-dialog-title">External library</h2>
         <label className="sbx-field sbx-field-block">
           <span>URLs — one https .js per line</span>

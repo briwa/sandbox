@@ -38,8 +38,9 @@ function buildPreview({ type, w, h, bg, id }, code, siblings) {
   return buildSrcdoc(spec, code, sandboxPrelude(siblings, id), sandboxExternals(siblings, id));
 }
 
-export default function SandboxModal({ kind = "figure", initial, siblings = [], onSave, onCancel, draftKey }) {
+export default function SandboxModal({ kind = "figure", variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey }) {
   const isFigure = kind === "figure";
+  const isInline = variant === "inline";
 
   const [restored] = useState(() => (draftKey ? loadSandboxDraft(draftKey) : null));
   const seed = restored ?? initial;
@@ -186,10 +187,11 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
   }, [draftSnapshot]);
 
   useEffect(() => {
+    if (isInline) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
-  }, []);
+  }, [isInline]);
 
   useEffect(() => {
     const flush = () => persistRef.current?.();
@@ -297,7 +299,12 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
   const isVue = type === "vue";
 
   return (
-    <div className="sbx-modal" role="dialog" aria-modal="true" aria-label={isFigure ? "Edit sandbox figure" : "Edit shared library"}>
+    <div
+      className={["sbx-modal", isInline ? "is-inline" : "", className].filter(Boolean).join(" ")}
+      role="dialog"
+      aria-modal={isInline ? undefined : "true"}
+      aria-label={isFigure ? "Edit sandbox figure" : "Edit shared library"}
+    >
       <div className="sbx-head">
         <div className="sbx-toolbar">
           {isFigure ? (

@@ -92,6 +92,15 @@
   flex-direction: column;
   background: var(--sbx-surface);
 }
+/* variant="inline": fills the nearest positioned ancestor instead of the
+   viewport, so a host can inset the authoring UI into one pane of its layout.
+   That container needs its own `position` — otherwise this finds the next one up. */
+.sbx-modal.is-inline,
+.sbx-overlay.is-inline { position: absolute; }
+/* Inset, the panel is narrower than the window, so the stacking breakpoint below
+   has to measure the panel. Fixed, the two are the same width and it stays a
+   media query — a container query on the whole thing would be a no-op there. */
+.sbx-modal.is-inline { container: sbx-modal / inline-size; }
 .sbx-head {
   display: flex;
   align-items: flex-start;
@@ -286,6 +295,12 @@
   background: var(--sbx-surface);
 }
 @media (max-width: 56rem) {
+  .sbx-body { flex-direction: column; }
+    .sbx-code-pane, .sbx-preview { flex: 1 1 0; }
+  .sbx-code-pane { border-bottom: 1px solid var(--sbx-rule); }
+  .sbx-divider { display: none; }
+}
+@container sbx-modal (max-width: 56rem) {
   .sbx-body { flex-direction: column; }
     .sbx-code-pane, .sbx-preview { flex: 1 1 0; }
   .sbx-code-pane { border-bottom: 1px solid var(--sbx-rule); }
