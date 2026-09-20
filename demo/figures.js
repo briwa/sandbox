@@ -1,12 +1,11 @@
 import '@briwa.dev/sandbox/styles';
 import './demo.css';
-import { mountFigures } from '@briwa.dev/sandbox/client';
 import { renderMarkdown } from './render.js';
 
 const source = `
 ## canvas
 
-\`\`\`js canvas 480x260 control=auto code
+\`\`\`sandbox=js viz 480x260 control=auto code
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   for (let i = 0; i < 60; i++) {
@@ -22,7 +21,7 @@ loop((t) => {
 
 ## svg
 
-\`\`\`js svg 480x160 control=none code
+\`\`\`sandbox=js viz=svg 480x160 control=none code
 svg.innerHTML = Array.from({ length: 24 }, (_, i) => {
   const x = 12 + i * 19.5;
   const h = 20 + Math.abs(Math.sin(i / 3)) * 110;
@@ -30,13 +29,13 @@ svg.innerHTML = Array.from({ length: 24 }, (_, i) => {
 }).join('');
 \`\`\`
 
-## Shared source with \`lib\`
+## Shared source
 
-\`\`\`js lib="polar helpers"
+\`\`\`sandbox=js label="polar helpers"
 const polar = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
 \`\`\`
 
-\`\`\`js canvas 480x220 control=auto code
+\`\`\`sandbox=js viz 480x220 control=auto code
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   ctx.beginPath();
@@ -51,20 +50,34 @@ loop((t) => {
 });
 \`\`\`
 
-## root
+## root + external
 
-\`\`\`js root 480x140 control=none code
+\`\`\`sandbox=external
+https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.js
+\`\`\`
+
+\`\`\`sandbox=js viz=root 480x140 control=none code
 root.style.display = 'grid';
 root.style.placeItems = 'center';
-root.innerHTML = '<p style="font:600 15px system-ui">any DOM you like, mounted into #root</p>';
+const btn = document.createElement('button');
+btn.textContent = 'confetti';
+btn.style.font = '600 14px system-ui';
+btn.style.padding = '10px 18px';
+btn.style.borderRadius = '8px';
+btn.style.border = '1px solid currentColor';
+btn.style.background = 'none';
+btn.style.color = 'inherit';
+btn.style.cursor = 'pointer';
+btn.onclick = () => confetti({ particleCount: 80, spread: 60, origin: { y: 0.8 } });
+root.append(btn);
 \`\`\`
 
 ## vue
 
-\`\`\`vue 480x170 code
+\`\`\`sandbox=vue viz 480x170 code
 <template>
   <div :style="box">
-    <button :style="btn" @click="n--">−</button>
+    <button :style="btn" @click="n--">-</button>
     <strong :style="{ fontSize: '28px', minWidth: '3ch', textAlign: 'center' }">{{ n }}</strong>
     <button :style="btn" @click="n++">+</button>
   </div>
@@ -78,7 +91,7 @@ const btn = { font: 'inherit', fontSize: '20px', width: '38px', height: '38px', 
 \`\`\`
 
 
-\`\`\`vue lib=StatChip id=chips
+\`\`\`sandbox=vue label=StatChip
 <template>
   <span :style="chip"><slot /></span>
 </template>
@@ -92,20 +105,17 @@ const chip = {
 </script>
 \`\`\`
 
-\`\`\`vue 480x120 id=chips
+\`\`\`sandbox=vue viz 480x120 code
 <template>
   <div :style="row">
     <StatChip v-for="w in words" :key="w">{{ w }}</StatChip>
   </div>
 </template>
 <script setup>
-const words = ['lib', 'external', 'vue'];
+const words = ['source', 'external', 'viz'];
 const row = { display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center', height: '100%' };
 </script>
 \`\`\`
 `;
 
-const mount = document.querySelector('#figures-prose');
-mount.innerHTML = await renderMarkdown(source);
-
-mountFigures();
+document.querySelector('#figures-prose').innerHTML = await renderMarkdown(source);

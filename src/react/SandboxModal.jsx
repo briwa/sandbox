@@ -10,12 +10,12 @@ import { codeServices } from "../editor/services.js";
 import { figureBg } from "../client/index.js";
 import { codeHighlightStyle } from "../editor/highlight.js";
 import { loadSandboxDraft, saveSandboxDraft, clearSandboxDraft } from "./storage.js";
+import { targetIdentity } from "./target.js";
 import { getCodeFenceSetting, setCodeFenceSetting } from "./storage.js";
 import {
   SANDBOX_TYPES,
   CONTROL_MODES,
   buildSandboxFence,
-  buildLibFence,
   buildSrcdoc,
   buildVueSrcdoc,
   sandboxPrelude,
@@ -27,18 +27,31 @@ const langCompartment = new Compartment();
 
 const langSupport = (name) => (name === "vue" ? vue() : javascript());
 
-function buildPreview({ type, w, h, bg, id }, code, siblings) {
+function buildPreview({ type, w, h, bg }, code, siblings) {
   if (type === "vue") {
     return buildVueSrcdoc({ w, h, bg }, code, {
-      externals: sandboxExternals(siblings, id),
-      components: sandboxVueComponents(siblings, id),
+      externals: sandboxExternals(siblings),
+      components: sandboxVueComponents(siblings),
     });
   }
-  const spec = { preset: type, w, h, bg, control: 'manual', id };
-  return buildSrcdoc(spec, code, sandboxPrelude(siblings, id), sandboxExternals(siblings, id));
+  const spec = { preset: type, w, h, bg, control: 'manual' };
+  return buildSrcdoc(spec, code, sandboxPrelude(siblings), sandboxExternals(siblings));
 }
 
-export default function SandboxModal({ kind = "figure", variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey }) {
+// SandboxEditor seeds its state once, so a new target must arrive as a remount, not as new props.
+export default function SandboxModal({ targetKey, initial, draftKey, ...rest }) {
+  const target = targetIdentity(targetKey, initial);
+  return (
+    <SandboxEditor
+      key={target}
+      initial={initial}
+      draftKey={draftKey ? `${draftKey}@${target}` : draftKey}
+      {...rest}
+    />
+  );
+}
+
+function SandboxEditor({ kind = "figure", variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey }) {
   const isFigure = kind === "figure";
   const isInline = variant === "inline";
 
@@ -57,7 +70,6 @@ export default function SandboxModal({ kind = "figure", variant = "fixed", class
   const [srcLang, setSrcLang] = useState(seed.srcLang || "js");
   const [name, setName] = useState(seed.name || "");
 
-  const [groupId, setGroupId] = useState(seed.id || "");
   const [srcdoc, setSrcdoc] = useState("");
   const [previewW, setPreviewW] = useState(initial.w || 640);
   const [previewH, setPreviewH] = useState(initial.h || 360);
@@ -88,7 +100,7 @@ export default function SandboxModal({ kind = "figure", variant = "fixed", class
     const width = Number(w) || 0;
     const height = Number(h) || 0;
 
-    setSrcdoc(buildPreview({ type, w: width, h: height, bg: bg || figureBg(), id: groupId }, body, siblings));
+    setSrcdoc(buildPreview({ type, w: width, h: height, bg: bg || figureBg() }, body, siblings));
     setPreviewW(width || 640);
     setPreviewH(height || 360);
     setFrameKey((k) => k + 1);
@@ -98,7 +110,7 @@ export default function SandboxModal({ kind = "figure", variant = "fixed", class
   const persist = () => {
     if (!draftKey || clearedRef.current) return;
     const code = cmRef.current ? cmRef.current.state.doc.toString() : (seed.code || "");
-    saveSandboxDraft(draftKey, { type, w, h, bg, showCode, control, preview, label, srcLang, name, id: groupId, code });
+    saveSandboxDraft(draftKey, { type, w, h, bg, showCode, control, preview, label, srcLang, name, code });
   };
   persistRef.current = persist;
   const scheduleSave = () => {
@@ -169,8 +181,8 @@ export default function SandboxModal({ kind = "figure", variant = "fixed", class
   // fell straight through the guard — so every modal opened already dirty and
   // wrote a recovery draft for an edit nobody had made. Comparing snapshots
   // instead is indifferent to how many times the effect runs.
-  const metaSnapshot = JSON.stringify([type, w, h, bg, label, groupId, srcLang, name]);
-  const draftSnapshot = JSON.stringify([type, w, h, bg, showCode, control, preview, label, srcLang, name, groupId]);
+  const metaSnapshot = JSON.stringify([type, w, h, bg, label, srcLang, name]);
+  const draftSnapshot = JSON.stringify([type, w, h, bg, showCode, control, preview, label, srcLang, name]);
   const metaSeenRef = useRef(metaSnapshot);
   const draftSeenRef = useRef(draftSnapshot);
 
@@ -270,15 +282,15 @@ export default function SandboxModal({ kind = "figure", variant = "fixed", class
   function save() {
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     if (isFigure) {
-      const state = { type, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, preview, label, id: groupId };
+      const state = { kind: "figure", type, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, preview, label };
       onSave(buildSandboxFence(state, body), { keepOpen: true });
       updatePreview();
     } else {
       finishDraft();
-      const fence = srcLang === "vue"
-        ? buildLibFence({ kind: "vue", name, id: groupId }, body)
-        : buildLibFence({ kind: "source", label: name, id: groupId }, body);
-      onSave(fence);
+      const state = srcLang === "vue"
+        ? { kind: "source", type: "vue", componentName: name }
+        : { kind: "source", type: "js", label: name };
+      onSave(buildSandboxFence(state, body));
     }
   }
   saveRef.current = save;
@@ -331,10 +343,6 @@ export default function SandboxModal({ kind = "figure", variant = "fixed", class
                 <span>Label</span>
                 <input type="text" placeholder="what this is" value={label} onChange={(e) => setLabel(e.target.value)} />
               </label>
-              <label className="sbx-field">
-                <span>Group</span>
-                <input type="text" placeholder="id" value={groupId} onChange={(e) => setGroupId(e.target.value)} />
-              </label>
               {!isVue && (
                 <label className="sbx-field">
                   <span>Controls</span>
@@ -365,10 +373,6 @@ export default function SandboxModal({ kind = "figure", variant = "fixed", class
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
-              </label>
-              <label className="sbx-field">
-                <span>Group</span>
-                <input type="text" placeholder="id" value={groupId} onChange={(e) => setGroupId(e.target.value)} />
               </label>
             </>
           )}

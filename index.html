@@ -10,7 +10,7 @@
 
     <nav>
       <a href="#figures" data-tab="figures">figures</a>
-      <a href="#playground" data-tab="playground">playground</a>
+      <a href="#controls" data-tab="controls">controls</a>
       <a href="#editor" data-tab="editor">editor</a>
     </nav>
 
@@ -18,17 +18,8 @@
       <div class="prose" id="figures-prose"></div>
     </section>
 
-    <section class="panel" id="panel-playground" hidden>
-      <div class="controls">
-        <label for="preset">load</label>
-        <select id="preset"></select>
-        <span id="status"></span>
-      </div>
-
-      <div class="split">
-        <textarea id="source" spellcheck="false" aria-label="Markdown source"></textarea>
-        <div class="prose" id="playground-prose"></div>
-      </div>
+    <section class="panel" id="panel-controls" hidden>
+      <div class="prose" id="controls-prose"></div>
     </section>
 
     <section class="panel" id="panel-editor" hidden>

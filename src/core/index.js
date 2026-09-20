@@ -25,7 +25,7 @@ export { DEFAULT_W, DEFAULT_H };
 
 export function specToToolbar(spec = {}) {
   return {
-    type: spec.vue ? 'vue' : (spec.preset || 'canvas'),
+    type: spec.lang === 'vue' ? 'vue' : (spec.preset || 'canvas'),
     w: spec.w || DEFAULT_W,
     h: spec.h || DEFAULT_H,
     bg: spec.bg || '',
@@ -33,7 +33,6 @@ export function specToToolbar(spec = {}) {
     control: spec.control || 'pausable',
     preview: Boolean(spec.preview),
     label: spec.label || '',
-    id: spec.id || '',
   };
 }
 
@@ -54,67 +53,81 @@ const firstDeclaration = (code) => {
   return '';
 };
 
-const trimUrl = (s) => {
-  if (!/^https?:\/\//i.test(s)) return s;
-  const parts = s.split(/[?#]/)[0].replace(/\/+$/, '').split('/').filter(Boolean);
-  const last = parts[parts.length - 1] || '';
-  return /^[0-9a-f]{7,}$/i.test(last) ? parts[parts.length - 2] || last : last;
-};
+// A URL already says what it is: prefer the `name@version` path segment npm CDNs
+// put in front of the build, and fall back to the bare filename.
+export function externalName(url) {
+  let parts;
+  try {
+    parts = new URL(url).pathname.split('/').filter(Boolean);
+  } catch {
+    return url;
+  }
+  const at = parts.findIndex((p) => !p.startsWith('@') && /@[\w.-]+$/.test(p));
+  if (at >= 0) {
+    const scope = parts[at - 1];
+    return scope && scope.startsWith('@') ? `${scope}/${parts[at]}` : parts[at];
+  }
+  const file = parts[parts.length - 1] || '';
+  return file.replace(/\.min\.js$/i, '').replace(/\.js$/i, '') || url;
+}
+
+export function externalLabel(code) {
+  const urls = (code || '').split(/\s+/).filter(Boolean);
+  if (!urls.length) return 'external library';
+  const first = externalName(urls[0]);
+  return urls.length > 1 ? `${first} +${urls.length - 1}` : first;
+}
 
 const detailOf = (label, ...parts) => parts.filter((p) => p && p !== label).join(' · ');
 
 export function describeSandboxBlock(spec = {}) {
-  const group = spec.id ? `#${spec.id}` : '';
   const named = firstDeclaration(spec.code);
 
-  if (spec.vueLib) {
-    const label = spec.label || spec.componentName || named || spec.id || 'vue component';
-    return { kind: 'vue-lib', label, detail: detailOf(label, 'vue component', group) };
+  if (spec.kind === 'external') {
+    const label = externalLabel(spec.code);
+    return { kind: 'external', label, detail: detailOf(label, 'external library') };
   }
-  if (spec.external) {
-    const first = (spec.code || '').split(/\s+/).filter(Boolean)[0] || '';
-    const label = trimUrl(spec.label || '') || trimUrl(first) || spec.id || 'external library';
-    return { kind: 'external', label, detail: detailOf(label, 'external library', group) };
-  }
-  if (spec.snippet) {
-    const label = spec.label || named || spec.id || 'shared source';
-    return { kind: 'snippet', label, detail: detailOf(label, 'shared source', group) };
+  if (spec.kind === 'source') {
+    if (spec.lang === 'vue') {
+      const label = spec.componentName || spec.label || 'vue component';
+      return { kind: 'vue', label, detail: detailOf(label, 'vue component') };
+    }
+    const label = spec.label || named || 'shared source';
+    return { kind: 'source', label, detail: detailOf(label, 'shared source') };
   }
 
-  const type = spec.vue ? 'vue' : spec.preset || 'canvas';
+  const type = spec.lang === 'vue' ? 'vue' : spec.preset || 'canvas';
   const size = `${type} ${spec.w || DEFAULT_W}×${spec.h || DEFAULT_H}`;
   const label = spec.label || named || size;
-  return { kind: 'figure', label, detail: detailOf(label, size, group) };
+  return { kind: 'figure', label, detail: detailOf(label, size) };
 }
 
 const metaValue = (v) => (/[\s"]/.test(v) ? `"${escapeAttr(v)}"` : v);
 
-export function serializeSandboxMeta({ type, w, h, bg, showCode, control, preview, label, id }) {
-  const lang = type === 'vue' ? 'vue' : 'js';
-  const tokens = [];
-  if (type !== 'vue') tokens.push(type);
+export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode, control, preview, label, componentName }) {
+  if (kind === 'external') return { lang: 'sandbox=external', meta: '' };
+
+  const isVue = type === 'vue';
+  const lang = isVue ? 'sandbox=vue' : 'sandbox=js';
+
+  if (kind === 'source') {
+    const name = isVue ? componentName || label : label;
+    return { lang, meta: name ? `label=${metaValue(name)}` : '' };
+  }
+
+  const tokens = [isVue || !type || type === 'canvas' ? 'viz' : `viz=${type}`];
   if (w && h && !(Number(w) === DEFAULT_W && Number(h) === DEFAULT_H)) tokens.push(`${w}x${h}`);
   if (bg) tokens.push(`bg=${metaValue(bg)}`);
   if (showCode) tokens.push('code');
-  if (control && control !== 'pausable' && type !== 'vue') tokens.push(`control=${control}`);
+  if (control && control !== 'pausable' && !isVue) tokens.push(`control=${control}`);
   if (preview) tokens.push('preview');
   if (label) tokens.push(`label=${metaValue(label)}`);
-  if (id) tokens.push(`id=${id}`);
   return { lang, meta: tokens.join(' ') };
 }
 
 export function buildSandboxFence(state, code) {
   const { lang, meta } = serializeSandboxMeta(state);
   const head = meta ? `${lang} ${meta}` : lang;
-  return '```' + head + '\n' + (code || '') + '\n```';
-}
-
-export function buildLibFence({ kind, label = '', name = '', id = '' }, code = '') {
-  let head;
-  if (kind === 'external') head = 'js external-lib' + (label ? `=${metaValue(label)}` : '');
-  else if (kind === 'vue') head = `vue lib=${metaValue(name)}`;
-  else head = 'js lib' + (label ? `=${metaValue(label)}` : '');
-  if (id) head += ` id=${id}`;
   return '```' + head + '\n' + (code || '') + '\n```';
 }
 
@@ -145,42 +158,45 @@ function tokenizeMeta(meta) {
   return { flags, values, has: (k) => flags.has(k) || k in values };
 }
 
+// ```sandbox=js              shared source, pooled into every figure in the document
+// ```sandbox=js viz           a figure — `viz=svg` / `viz=root` pick the surface
+// ```sandbox=vue label=Name   a component every vue figure can render
+// ```sandbox=external         https .js URLs, one per line
+// Anything else — plain ```js, ```vue — is an ordinary code block we never touch.
 export function parseMeta(lang, meta) {
-  const isVue = lang === 'vue';
-  if (lang !== 'js' && lang !== 'javascript' && !isVue) return null;
-  const { flags, values, has } = tokenizeMeta(meta);
+  const dialect = /^sandbox=(js|vue|external)$/.exec((lang || '').trim())?.[1];
+  if (!dialect) return null;
+  if (dialect === 'external') return { kind: 'external', lang: 'external' };
 
-  const id = /^[\w-]+$/.test(values.id || '') ? values.id : '';
+  const { flags, values, has } = tokenizeMeta(meta);
   const label = values.label || '';
+  const isVue = dialect === 'vue';
+
+  if (!has('viz')) {
+    if (!isVue) return { kind: 'source', lang: 'js', label };
+    // A Vue SFC carries no name of its own, so `label` doubles as the tag to register under.
+    const componentName = /^[A-Z][\w-]*$/.test(label) ? label : '';
+    return { kind: 'source', lang: 'vue', componentName, label };
+  }
+
   const size = [...flags].find((t) => /^\d+x\d+$/.test(t));
   const [w, h] = size ? size.split('x').map(Number) : [DEFAULT_W, DEFAULT_H];
   const bg = /^[#\w(),.%\s-]+$/.test(values.bg || '') ? values.bg : '';
   const showCode = flags.has('code');
   const preview = flags.has('preview');
 
-  if (isVue) {
-    if (has('lib')) {
-      const name = values.lib || '';
-      const componentName = /^[A-Za-z][\w-]*$/.test(name) ? name : '';
-      return { vue: true, vueLib: true, componentName, label: name, id };
-    }
-    return { vue: true, preset: 'root', w, h, showCode, bg, label, id, preview };
-  }
+  if (isVue) return { kind: 'figure', lang: 'vue', preset: 'root', w, h, showCode, bg, label, preview };
 
-  const preset = [...flags].find((t) => PRESETS.has(t));
-  if (!preset && has('external-lib')) return { external: true, label: values['external-lib'] || '', id };
-  if (!preset && has('lib')) return { snippet: true, label: values.lib || '', id };
-  if (!preset) return null;
-
+  const preset = PRESETS.has(values.viz) ? values.viz : 'canvas';
   let control = values.control || (flags.has('auto') ? 'auto' : 'pausable');
   if (!CONTROL_MODES.includes(control)) control = 'pausable';
 
-  return { preset, w, h, showCode, bg, control, label, id, preview };
+  return { kind: 'figure', lang: 'js', preset, w, h, showCode, bg, control, label, preview };
 }
 
-export function sandboxPrelude(blocks, groupId = '') {
+export function sandboxPrelude(blocks) {
   return (blocks || [])
-    .filter((b) => b.snippet && (b.id || '') === (groupId || ''))
+    .filter((b) => b.kind === 'source' && b.lang === 'js')
     .map((b) => b.code)
     .join('\n\n');
 }
@@ -206,17 +222,17 @@ export function isRawGistUrl(u) {
   }
 }
 
-export function sandboxExternals(blocks, groupId = '') {
+export function sandboxExternals(blocks) {
   return (blocks || [])
-    .filter((b) => b.external && (b.id || '') === (groupId || ''))
+    .filter((b) => b.kind === 'external')
     .flatMap((b) => (b.code || '').split(/\s+/))
     .map(safeUrl)
     .filter(Boolean);
 }
 
-export function sandboxVueComponents(blocks, groupId = '') {
+export function sandboxVueComponents(blocks) {
   return (blocks || [])
-    .filter((b) => b.vueLib && b.componentName && (b.id || '') === (groupId || ''))
+    .filter((b) => b.kind === 'source' && b.lang === 'vue' && b.componentName)
     .map((b) => ({ name: b.componentName, code: b.code }));
 }
 
@@ -261,7 +277,7 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
     `const {loadModule}=window['vue3-sfc-loader'];` +
     (fetched.length
       ? `const __fx=[${fetched.map((u) => JSON.stringify(u)).join(',')}];` +
-        `const __loadExt=async()=>{for(const u of __fx){const r=await fetch(u);if(!r.ok)throw new Error('external-lib '+u+' failed: HTTP '+r.status);const s=document.createElement('script');s.textContent=await r.text();document.head.appendChild(s)}};`
+        `const __loadExt=async()=>{for(const u of __fx){const r=await fetch(u);if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);const s=document.createElement('script');s.textContent=await r.text();document.head.appendChild(s)}};`
       : `const __loadExt=async()=>{};`) +
     `(async()=>{try{await __loadExt();const app=Vue.createApp(await loadModule('/__main__.vue',opts));${regs}app.mount(root)}catch(e){document.body.innerHTML='<pre class=err>'+(e&&e.stack||e)+'</pre>'}report()})();`;
 
@@ -326,7 +342,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
 
   const loadExt = fetched.length
     ? `const __fx=[${fetched.map((u) => JSON.stringify(u)).join(',')}];` +
-      `const start=()=>__fx.reduce((p,u)=>p.then(()=>fetch(u)).then(r=>{if(!r.ok)throw new Error('external-lib '+u+' failed: HTTP '+r.status);return r.text()}).then(t=>{const s=document.createElement('script');s.textContent=t;document.head.appendChild(s)}),Promise.resolve()).then(run,e=>{document.body.innerHTML='<pre class=err>'+(e&&e.stack||e)+'</pre>';report()});`
+      `const start=()=>__fx.reduce((p,u)=>p.then(()=>fetch(u)).then(r=>{if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);return r.text()}).then(t=>{const s=document.createElement('script');s.textContent=t;document.head.appendChild(s)}),Promise.resolve()).then(run,e=>{document.body.innerHTML='<pre class=err>'+(e&&e.stack||e)+'</pre>';report()});`
     : `const start=run;`;
 
   const resettable = (isCanvas || isRoot) && !hover;

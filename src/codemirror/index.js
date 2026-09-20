@@ -73,7 +73,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
 
   class SandboxCard extends WidgetType {
     constructor(block, index) { super(); this.block = block; this.index = index; this.name = describeSandboxBlock(block).label; }
-    sig() { const b = this.block; return `${b.from}:${b.to}:${b.vue}:${b.preset}:${b.bg}:${b.showCode}:${b.control}:${b.preview}:${b.id}:${this.name}`; }
+    sig() { const b = this.block; return `${b.from}:${b.to}:${b.lang}:${b.preset}:${b.bg}:${b.showCode}:${b.control}:${b.preview}:${this.name}`; }
     eq(o) { return this.index === o.index && this.sig() === o.sig(); }
     toDOM(view) {
       const b = this.block;
@@ -87,13 +87,14 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       label.textContent = this.name;
       label.title = this.name;
       chips.appendChild(label);
-      const addChip = (text) => { const c = document.createElement('span'); c.className = 'cm-sbx-chip'; c.textContent = text; chips.appendChild(c); };
-      const lang = b.vue ? 'vue' : 'js';
-      const preset = b.vue ? 'root' : b.preset;
-      chips.appendChild(iconChip(lang, lang));
-      chips.appendChild(iconChip(preset, preset));
-      if (b.id) addChip(`id=${b.id}`);
-      if (b.bg) addChip(`bg=${b.bg}`);
+      chips.appendChild(iconChip(b.lang, b.lang));
+      chips.appendChild(iconChip(b.preset, b.preset));
+      if (b.bg) {
+        const c = document.createElement('span');
+        c.className = 'cm-sbx-chip';
+        c.textContent = `bg=${b.bg}`;
+        chips.appendChild(c);
+      }
 
       const actions = document.createElement('div');
       actions.className = 'cm-sbx-actions';
@@ -123,7 +124,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
         lbl.title = this.label;
         chips.appendChild(lbl);
       }
-      for (const [icon, title] of KIND_ICONS[this.kind] ?? KIND_ICONS.snippet) chips.appendChild(iconChip(icon, title));
+      for (const [icon, title] of KIND_ICONS[this.kind] ?? KIND_ICONS.source) chips.appendChild(iconChip(icon, title));
       const actions = document.createElement('div');
       actions.className = 'cm-sbx-actions';
       actions.append(...editRemove(view, this.block));
@@ -141,14 +142,14 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       const b = this.block;
       const fig = document.createElement('figure');
       fig.className = 'sandbox cm-sandbox';
-      fig.dataset.preset = b.vue ? 'root' : b.preset;
+      fig.dataset.preset = b.preset;
 
       const stage = document.createElement('div');
       stage.className = 'sandbox-stage';
       const iframe = document.createElement('iframe');
       iframe.className = 'sandbox-frame';
       iframe.setAttribute('sandbox', 'allow-scripts');
-      iframe.title = `live ${b.vue ? 'vue' : b.preset} preview`;
+      iframe.title = `live ${b.lang === 'vue' ? 'vue' : b.preset} preview`;
       iframe.srcdoc = this.srcdoc;
       stage.appendChild(iframe);
 
@@ -173,18 +174,15 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
 
       if (!b.closed) return;
       const replace = (widget) => ranges.push(Decoration.replace({ widget, block: true }).range(b.from, b.to));
-      if (b.snippet) {
-        replace(new LibCard(b, i, 'snippet', describeSandboxBlock(b).label));
-      } else if (b.external) {
-        replace(new LibCard(b, i, 'external', describeSandboxBlock(b).label));
-      } else if (b.vueLib) {
-        replace(new LibCard(b, i, 'vue-lib', describeSandboxBlock(b).label));
+      const { kind, label } = describeSandboxBlock(b);
+      if (kind !== 'figure') {
+        replace(new LibCard(b, i, kind, label));
       } else if (previews.has(i)) {
 
-        const externals = sandboxExternals(blocks, b.id);
-        const srcdoc = b.vue
-          ? buildVueSrcdoc(b, b.code, { externals, components: sandboxVueComponents(blocks, b.id) })
-          : buildSrcdoc(b, b.code, sandboxPrelude(blocks, b.id), externals);
+        const externals = sandboxExternals(blocks);
+        const srcdoc = b.lang === 'vue'
+          ? buildVueSrcdoc(b, b.code, { externals, components: sandboxVueComponents(blocks) })
+          : buildSrcdoc(b, b.code, sandboxPrelude(blocks), externals);
         replace(new PreviewWidget(b, srcdoc, i));
       } else {
         replace(new SandboxCard(b, i));
@@ -218,7 +216,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
     }
   );
 
-  const COMMANDS = { '/sandbox': 'figure', '/sandbox-lib': 'external', '/sandbox-source': 'source' };
+  const COMMANDS = { '/sandbox': 'figure', '/sandbox-source': 'source', '/sandbox-external': 'external' };
   const slashCommand = Prec.high(keymap.of([{
     key: 'Enter',
     run(view) {
@@ -235,8 +233,8 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
 
   const SLASH_OPTIONS = [
     { label: '/sandbox', kind: 'figure', detail: 'interactive figure' },
-    { label: '/sandbox-lib', kind: 'external', detail: 'external library' },
     { label: '/sandbox-source', kind: 'source', detail: 'shared source' },
+    { label: '/sandbox-external', kind: 'external', detail: 'external library' },
   ];
   const slashComplete = autocompletion({
     override: [(ctx) => {

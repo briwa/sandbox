@@ -1,11 +1,16 @@
 import '@briwa.dev/sandbox/styles';
 import './demo.css';
+import { mountFigures } from '@briwa.dev/sandbox/client';
 
 const TABS = {
   figures: () => import('./figures.js'),
-  playground: () => import('./playground.js'),
+  controls: () => import('./controls.js'),
   editor: () => import('./editor.jsx'),
 };
+
+// One host for every tab: mountFigures resolves its frames lazily, so figures a tab
+// renders later are picked up without mounting a second set of global listeners.
+mountFigures();
 
 const DEFAULT_TAB = 'figures';
 

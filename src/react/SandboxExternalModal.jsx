@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon.jsx";
-import { buildLibFence, safeUrl } from "../core/index.js";
+import { buildSandboxFence, externalName, safeUrl } from "../core/index.js";
+import { targetIdentity } from "./target.js";
 
-export default function SandboxExternalModal({ variant = "fixed", className = "", initial, onSave, onCancel }) {
+export default function SandboxExternalModal({ targetKey, initial, ...rest }) {
+  return <ExternalEditor key={targetIdentity(targetKey, initial)} initial={initial} {...rest} />;
+}
+
+function ExternalEditor({ variant = "fixed", className = "", initial, onSave, onCancel }) {
   const [urls, setUrls] = useState(initial.code || "");
-  const [label, setLabel] = useState(initial.label || "");
-  const [groupId, setGroupId] = useState(initial.id || "");
   const inputRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -16,10 +19,11 @@ export default function SandboxExternalModal({ variant = "fixed", className = ""
   }, [onCancel]);
 
   const lines = urls.split(/\s+/).filter(Boolean);
+  const good = lines.filter(safeUrl);
   const bad = lines.filter((u) => !safeUrl(u));
 
   function save() {
-    onSave(buildLibFence({ kind: "external", label, id: groupId }, lines.join("\n")));
+    onSave(buildSandboxFence({ kind: "external" }, good.join("\n")));
   }
 
   return (
@@ -40,21 +44,14 @@ export default function SandboxExternalModal({ variant = "fixed", className = ""
             onChange={(e) => setUrls(e.target.value)}
           />
         </label>
+        {good.length > 0 && (
+          <p className="sbx-note">Reads as {good.map(externalName).join(", ")}</p>
+        )}
         {bad.length > 0 && (
           <p className="sbx-warn">Ignored (not an https .js URL): {bad.join(", ")}</p>
         )}
-        <div className="sbx-dialog-row">
-          <label className="sbx-field">
-            <span>Label</span>
-            <input type="text" placeholder="what this is" value={label} onChange={(e) => setLabel(e.target.value)} />
-          </label>
-          <label className="sbx-field">
-            <span>Group</span>
-            <input type="text" placeholder="id" value={groupId} onChange={(e) => setGroupId(e.target.value)} />
-          </label>
-        </div>
         <div className="sbx-actions">
-          <button className="sbx-btn save" onClick={save} disabled={!lines.length} title="Save">
+          <button className="sbx-btn save" onClick={save} disabled={!good.length} title="Save">
             <Icon name="check" size={17} /> Save
           </button>
           <button className="sbx-btn" onClick={onCancel} title="Cancel">

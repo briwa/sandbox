@@ -24,9 +24,9 @@ export const ICONS = {
 };
 
 export const KIND_ICONS = {
-  snippet: [['file', 'lib']],
-  external: [['file', 'lib'], ['globe', 'external']],
-  'vue-lib': [['file', 'lib'], ['vue', 'vue']],
+  source: [['file', 'shared source']],
+  vue: [['file', 'shared source'], ['vue', 'vue component']],
+  external: [['globe', 'external library']],
 };
 
 export const iconSvg = (name, size = 15) =>

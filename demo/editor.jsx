@@ -17,11 +17,11 @@ const START = `# An entry with figures
 Type \`/\` on an empty line to insert a block, or press Edit on a card below.
 The outline beside the editor is one row per sandbox, names and all.
 
-\`\`\`js lib="shared helpers"
+\`\`\`sandbox=js label="shared helpers"
 const wave = (t, i) => Math.sin(t / 500 + i / 3);
 \`\`\`
 
-\`\`\`js canvas 460x200 control=auto label="Marching squares"
+\`\`\`sandbox=js viz 460x200 control=auto label="Marching squares"
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = 'currentColor';
@@ -34,7 +34,7 @@ loop((t) => {
 Prose between figures stays ordinary markdown. The figure below carries no \`label\`, so the outline
 falls back to the first thing its code declares.
 
-\`\`\`js svg 460x160
+\`\`\`sandbox=js viz=svg 460x160
 const drawGrid = () => {
   for (let x = 20; x < width; x += 36) {
     const line = document.createElementNS(svg.namespaceURI, 'line');
@@ -70,12 +70,11 @@ function Editor() {
   onEditRef.current = (block) => {
     if (editing && editing.from === block.from) return;
     const base = { from: block.from, to: block.to, siblings: siblingsNow() };
-    if (block.snippet) {
-      setEditing({ ...base, modal: 'source', initial: { srcLang: 'js', name: block.label, id: block.id, code: block.code } });
-    } else if (block.vueLib) {
-      setEditing({ ...base, modal: 'source', initial: { srcLang: 'vue', name: block.componentName, id: block.id, code: block.code } });
-    } else if (block.external) {
-      setEditing({ ...base, modal: 'external', initial: { label: block.label, id: block.id, code: block.code } });
+    if (block.kind === 'external') {
+      setEditing({ ...base, modal: 'external', initial: { code: block.code } });
+    } else if (block.kind === 'source') {
+      const name = block.lang === 'vue' ? block.componentName : block.label;
+      setEditing({ ...base, modal: 'source', initial: { srcLang: block.lang, name, code: block.code } });
     } else {
       setEditing({ ...base, modal: 'figure', initial: { ...specToToolbar(block), code: block.code } });
     }
@@ -84,14 +83,14 @@ function Editor() {
   onCreateRef.current = (kind, pos) => {
     const base = { from: pos, to: pos, siblings: siblingsNow() };
     if (kind === 'external') {
-      setEditing({ ...base, modal: 'external', initial: { label: '', id: '', code: '' } });
+      setEditing({ ...base, modal: 'external', initial: { code: '' } });
     } else if (kind === 'source') {
-      setEditing({ ...base, modal: 'source', initial: { srcLang: 'js', name: '', id: '', code: '' } });
+      setEditing({ ...base, modal: 'source', initial: { srcLang: 'js', name: '', code: '' } });
     } else {
       setEditing({
         ...base,
         modal: 'figure',
-        initial: { type: 'canvas', w: DEFAULT_W, h: DEFAULT_H, bg: '', showCode: false, control: 'pausable', preview: false, label: '', id: '', code: '' },
+        initial: { type: 'canvas', w: DEFAULT_W, h: DEFAULT_H, bg: '', showCode: false, control: 'pausable', preview: false, label: '', code: '' },
       });
     }
   };
@@ -149,32 +148,32 @@ function Editor() {
 
         {editing?.modal === 'figure' && (
           <SandboxModal
-            key={editing.from}
             kind="figure"
             variant="inline"
+            targetKey={editing.from}
             initial={editing.initial}
             siblings={editing.siblings}
-            draftKey={`demo-figure@${editing.from}`}
+            draftKey="demo-figure"
             onSave={save}
             onCancel={() => setEditing(null)}
           />
         )}
         {editing?.modal === 'source' && (
           <SandboxModal
-            key={editing.from}
             kind="source"
             variant="inline"
+            targetKey={editing.from}
             initial={editing.initial}
             siblings={editing.siblings}
-            draftKey={`demo-source@${editing.from}`}
+            draftKey="demo-source"
             onSave={save}
             onCancel={() => setEditing(null)}
           />
         )}
         {editing?.modal === 'external' && (
           <SandboxExternalModal
-            key={editing.from}
             variant="inline"
+            targetKey={editing.from}
             initial={editing.initial}
             onSave={save}
             onCancel={() => setEditing(null)}

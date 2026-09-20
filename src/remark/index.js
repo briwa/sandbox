@@ -14,12 +14,22 @@ import { iconSvg, KIND_ICONS } from '../core/icons.js';
 
 const libSummary = (kind, label) =>
   `<summary><span class="sandbox-lib-label">${escapeHtml(label)}</span>` +
-  (KIND_ICONS[kind] ?? KIND_ICONS.snippet)
+  (KIND_ICONS[kind] ?? KIND_ICONS.source)
     .map(([icon, title]) => `<span class="sandbox-lib-tag" title="${title}" aria-label="${title}">${iconSvg(icon, 13)}</span>`)
     .join('') +
   `</summary>`;
 
 const plainHighlight = (code) => `<pre class="astro-code"><code>${escapeHtml(code)}</code></pre>`;
+
+const externalUrlList = (code) => {
+  const urls = (code || '').split(/\s+/).map(safeUrl).filter(Boolean);
+  const body = urls.length
+    ? urls
+        .map((u) => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(u)}</a>`)
+        .join('')
+    : `<span class="sandbox-external-bad">${escapeHtml((code || '').trim())}</span>`;
+  return `<div class="sandbox-external-urls">${body}</div>`;
+};
 
 export function remarkSandbox({ highlight } = {}) {
 
@@ -49,61 +59,33 @@ export function remarkSandbox({ highlight } = {}) {
     walk(tree);
 
     const allBlocks = found.map(({ spec, code }) => ({ ...spec, code }));
+    const externals = sandboxExternals(allBlocks);
+    const components = sandboxVueComponents(allBlocks);
+    const prelude = sandboxPrelude(allBlocks);
 
     await Promise.all(
       found.map(async ({ parent, index, spec, code }) => {
+        const { kind, label } = describeSandboxBlock({ ...spec, code });
 
-        if (spec.snippet) {
-          const libHtml = await highlightCode(code);
+        if (kind !== 'figure') {
+          const body = kind === 'external' ? externalUrlList(code) : await highlightCode(code, spec.lang);
           parent.children[index] = {
             type: 'html',
             value:
-              `<details class="sandbox sandbox-lib">` +
-              libSummary('snippet', describeSandboxBlock({ ...spec, code }).label) +
-              `${libHtml}</details>`,
+              `<details class="sandbox sandbox-lib${kind === 'external' ? ' sandbox-external' : ''}">` +
+              libSummary(kind, label) +
+              body +
+              `</details>`,
           };
           return;
         }
 
-        if (spec.external) {
-          const urls = (code || '').split(/\s+/).map(safeUrl).filter(Boolean);
-          const body = urls.length
-            ? urls
-                .map(
-                  (u) =>
-                    `<a href="${escapeAttr(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(u)}</a>`
-                )
-                .join('')
-            : `<span class="sandbox-external-bad">${escapeHtml((code || '').trim())}</span>`;
-          parent.children[index] = {
-            type: 'html',
-            value:
-              `<details class="sandbox sandbox-lib sandbox-external">` +
-              libSummary('external', describeSandboxBlock({ ...spec, code }).label) +
-              `<div class="sandbox-external-urls">${body}</div></details>`,
-          };
-          return;
-        }
-
-        if (spec.vueLib) {
-          const libHtml = await highlightCode(code, 'vue');
-          parent.children[index] = {
-            type: 'html',
-            value:
-              `<details class="sandbox sandbox-lib">` +
-              libSummary('vue-lib', describeSandboxBlock({ ...spec, code }).label) +
-              `${libHtml}</details>`,
-          };
-          return;
-        }
-
-        const externals = sandboxExternals(allBlocks, spec.id);
         const srcdoc = escapeAttr(
-          spec.vue
-            ? buildVueSrcdoc(spec, code, { externals, components: sandboxVueComponents(allBlocks, spec.id) })
-            : buildSrcdoc(spec, code, sandboxPrelude(allBlocks, spec.id), externals)
+          spec.lang === 'vue'
+            ? buildVueSrcdoc(spec, code, { externals, components })
+            : buildSrcdoc(spec, code, prelude, externals)
         );
-        const codeHtml = spec.showCode ? await highlightCode(code, spec.vue ? 'vue' : 'js') : '';
+        const codeHtml = spec.showCode ? await highlightCode(code, spec.lang) : '';
         const html =
 
           `<figure class="sandbox" data-mode="preview" data-preset="${spec.preset}" style="--sandbox-h:${spec.h}px">` +

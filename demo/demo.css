@@ -53,8 +53,7 @@ h1 {
   margin-inline: auto;
 }
 
-/* The two tool tabs need room for their own layout; they stay centred on the same axis. */
-#panel-playground,
+/* The editor tab needs room for its own layout; it stays centred on the same axis. */
 #panel-editor {
   max-width: var(--wide);
 }
@@ -82,15 +81,6 @@ li {
 ul {
   margin: 0;
   padding-left: 1.2rem;
-}
-
-.controls {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-  font-size: 0.8rem;
 }
 
 button,
@@ -149,34 +139,6 @@ select {
 :root {
   --bg: Canvas;
   --ink: CanvasText;
-}
-
-/* Two-column playground: markdown source on the left, live figures on the right. */
-.split {
-  display: flex;
-  gap: 1.5rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  width: 100%;
-}
-
-.split > * {
-  flex: 1 1 22rem;
-  min-width: 0;
-}
-
-textarea {
-  width: 100%;
-  min-height: 26rem;
-  font: inherit;
-  font-size: 0.78rem;
-  line-height: 1.6;
-  color: inherit;
-  background: none;
-  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-  border-radius: 6px;
-  padding: 0.7rem;
-  resize: vertical;
 }
 
 /* The editor demo's CodeMirror host. */
