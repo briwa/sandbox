@@ -220,6 +220,13 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
       if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
         saveRef.current?.();
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (document.activeElement?.closest?.(".editor-find")) return;
+        if (!escapeRef.current?.()) return;
+        e.preventDefault();
       }
     };
     document.addEventListener("keydown", onKey, true);
@@ -279,6 +286,13 @@ export default function SandboxModal({ kind = "figure", initial, siblings = [], 
     finishDraft();
     onCancel();
   }
+
+  const escapeRef = useRef(null);
+  escapeRef.current = () => {
+    if (dirty) return false;
+    requestClose();
+    return true;
+  };
 
   const isVue = type === "vue";
 
