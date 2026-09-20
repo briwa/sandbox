@@ -341,7 +341,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
           <label className="sbx-field">
             <span>Visualize</span>
             <select value={viz} onChange={(e) => setViz(e.target.value)}>
-              <option value="">no &mdash; shared source</option>
+              <option value="">no</option>
               {VIZ_SURFACES[lang].map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
           </label>
