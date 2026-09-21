@@ -7,12 +7,14 @@ import { vue } from "@codemirror/lang-vue";
 import Icon from "./Icon.jsx";
 import EditorFind from "./EditorFind.jsx";
 import { codeServices } from "../editor/services.js";
+import { showError, clearError } from "../editor/errors.js";
 import { figureBg } from "../client/index.js";
 import { codeHighlightStyle } from "../editor/highlight.js";
 import { loadSandboxDraft, saveSandboxDraft, clearSandboxDraft } from "./storage.js";
 import { targetIdentity } from "./target.js";
 import { getCodeFenceSetting, setCodeFenceSetting } from "./storage.js";
 import {
+  MSG_ERROR,
   VIZ_SURFACES,
   CONTROL_MODES,
   buildSandboxFence,
@@ -108,6 +110,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     const width = Number(w) || 0;
     const height = Number(h) || 0;
 
+    clearError(cmRef.current);
     setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg() }, body, siblings));
     setPreviewW(width || 640);
     setPreviewH(height || 360);
@@ -245,6 +248,8 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     const onMessage = (e) => {
       if (!frameRef.current || frameRef.current.contentWindow !== e.source || !e.data) return;
       if (e.data.__sandboxReset) { setPlaying(false); return; }
+      const err = e.data[MSG_ERROR];
+      if (err) { showError(cmRef.current, err); return; }
       const height = e.data.__sandboxHeight;
       if (typeof height !== "number" || height <= 0) return;
 
@@ -283,6 +288,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   }
 
   function resetFrame() {
+    clearError(cmRef.current);
     frameRef.current?.contentWindow?.postMessage({ __figreset: true }, "*");
   }
 

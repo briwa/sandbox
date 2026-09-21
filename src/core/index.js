@@ -286,7 +286,7 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
       ? `const __fx=[${fetched.map((u) => JSON.stringify(u)).join(',')}];` +
         `const __loadExt=async()=>{for(const u of __fx){const r=await fetch(u);if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);const s=document.createElement('script');s.textContent=await r.text();document.head.appendChild(s)}};`
       : `const __loadExt=async()=>{};`) +
-    `(async()=>{try{await __loadExt();const app=Vue.createApp(await loadModule('/__main__.vue',opts));${regs}app.mount(root)}catch(e){document.body.innerHTML='<pre class=err>'+(e&&e.stack||e)+'</pre>'}report()})();`;
+    `(async()=>{try{await __loadExt();const app=Vue.createApp(await loadModule('/__main__.vue',opts));${regs}app.mount(root)}catch(e){const m=String(e&&e.stack||e);document.body.innerHTML='<pre class=err>'+m+'</pre>';parent.postMessage({__sandboxError:{message:m}},'*')}report()})();`;
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div id="root"></div>${ext}<script src="${VUE_SRC}"></script><script src="${SFC_LOADER_SRC}"></script><script>${script}</script></body></html>`;
 }
@@ -414,6 +414,24 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
         ? `start();addEventListener('message',function(e){if(!__fn||!e.data)return;if(e.data.__figplay){if(__raf==null){__t0=null;__raf=requestAnimationFrame(__tick)}}else if('__figplay' in e.data){reset()}});`
 
         : pauseControls + `start();` + (pausable ? `__resumeFig();` : ``);
+  // Everything the srcdoc puts above the user's code is emitted on one line, so a line
+  // number reported from inside the frame maps back to an editor line by subtracting this
+  // base. Prelude lines land at zero or below, which the host reads as "thrown in a shared
+  // source, not in this block".
+  const lineBase = 1 + String(prelude).split('\n').length;
+
+  const errorReporting =
+    `const __base=${lineBase};` +
+    `const __own=(f)=>!/^(https?|blob):/.test(f||'');` +
+    `const __pick=(s)=>{const hits=String(s||'').match(/[^\\s()]+:\\d+:\\d+/g)||[];` +
+      `for(const hit of hits){const p=/^(.*):(\\d+):(\\d+)$/.exec(hit);if(!__own(p[1]))continue;return{line:+p[2]-__base,col:+p[3]}}return null};` +
+    `const __evLoc=(e)=>e.lineno&&__own(e.filename)?{line:e.lineno-__base,col:e.colno||0}:__pick(e.error&&e.error.stack);` +
+    `const showErr=(m,loc)=>{const hint=loc&&loc.line<1?'Thrown in a shared source block.\\n\\n':'';` +
+      `document.body.innerHTML='<pre class=err>'+hint+m+'</pre>';` +
+      `parent.postMessage({__sandboxError:{message:String(m),line:loc&&loc.line,col:loc&&loc.col}},'*');report()};` +
+    `addEventListener('error',e=>showErr((e.error&&e.error.stack)||e.message,__evLoc(e)));` +
+    `addEventListener('unhandledrejection',e=>showErr((e.reason&&e.reason.stack)||e.reason,__pick(e.reason&&e.reason.stack)));`;
+
   const script =
     VIS_GATE +
     setup +
@@ -424,10 +442,8 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
     `new ResizeObserver(report).observe(document.documentElement);` +
     themeSync +
 
-    `const showErr=(m)=>{document.body.innerHTML='<pre class=err>'+m+'</pre>';report()};` +
-    `addEventListener('error',e=>showErr((e.error&&e.error.stack)||e.message));` +
-    `addEventListener('unhandledrejection',e=>showErr((e.reason&&e.reason.stack)||e.reason));` +
-    `const run=()=>{try{\n${prelude}\n${code}\n}catch(e){showErr(e&&e.stack||e);return}report()};` +
+    errorReporting +
+    `const run=()=>{try{\n${prelude}\n${code}\n}catch(e){showErr(e&&e.stack||e,__pick(e&&e.stack));return}report()};` +
     loadExt +
     tail;
 

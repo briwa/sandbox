@@ -3,6 +3,7 @@ import { history, historyKeymap, defaultKeymap, indentMore, indentLess, redo } f
 import { indentUnit, indentOnInput } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { editorFind } from "./find.js";
+import { editorErrors } from "./errors.js";
 
 const tabIndent = ({ state, dispatch }) => {
   if (state.selection.ranges.some((r) => !r.empty)) return indentMore({ state, dispatch });
@@ -21,6 +22,7 @@ export function codeServices(extraKeys = []) {
     indentOnInput(),
     closeBrackets(),
     editorFind,
+    editorErrors,
     keymap.of([...codeKeybindings, ...extraKeys]),
   ];
 }
