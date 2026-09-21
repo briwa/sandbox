@@ -95,8 +95,8 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const isFigure = viz !== "";
   const isVue = lang === "vue";
   const codeLang = isVue ? "vue" : "javascript";
-  const canPlay = isFigure && !isVue;
-  const canReset = isFigure && (viz === "canvas" || viz === "root");
+  // Canvas is the only surface the preview drives: svg draws once, and root and vue are mounted by the code itself.
+  const hasPreviewControls = isFigure && viz === "canvas";
   // Only these two surfaces render playback UI: canvas gets the play button, pause-on-click
   // and the reset overlay, root gets the play button and reset. svg draws once and vue is
   // mounted by its own runtime, so `control` has nothing to act on.
@@ -283,8 +283,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   }
 
   function resetFrame() {
-    if (canReset) frameRef.current?.contentWindow?.postMessage({ __figreset: true }, "*");
-    else setFrameKey((k) => k + 1);
+    frameRef.current?.contentWindow?.postMessage({ __figreset: true }, "*");
   }
 
   function startResize(e) {
@@ -455,16 +454,16 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
         )}
         {isFigure && (
           <div className="sbx-preview">
-            <div className="sbx-controls" role="toolbar" aria-label="Preview controls">
-              {canPlay && (
+            {hasPreviewControls && (
+              <div className="sbx-controls" role="toolbar" aria-label="Preview controls">
                 <button className="sbx-ctl sbx-icon" onClick={togglePlay} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
                   <Icon name={playing ? "pause" : "play"} size={16} />
                 </button>
-              )}
-              <button className="sbx-ctl sbx-icon" onClick={resetFrame} title="Restart the preview" aria-label="Restart the preview">
-                <Icon name="reset" size={16} />
-              </button>
-            </div>
+                <button className="sbx-ctl sbx-icon" onClick={resetFrame} title="Restart the preview" aria-label="Restart the preview">
+                  <Icon name="reset" size={16} />
+                </button>
+              </div>
+            )}
             <iframe
               key={frameKey}
               ref={frameRef}
