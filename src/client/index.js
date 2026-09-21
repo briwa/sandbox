@@ -129,17 +129,33 @@ export function mountFigures({
     else window.addEventListener('load', primeFigures);
   }
 
+  const setBtn = (btn, icon, label) => {
+    btn.innerHTML = iconSvg(icon);
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  };
+
   const onToggle = (e) => {
+    const copyBtn = e.target.closest('.sandbox-copy');
+    if (copyBtn) {
+      // Inside a <summary>, a click would otherwise fold the block shut.
+      e.preventDefault();
+      const code = copyBtn.closest('.sandbox')?.querySelector('.sandbox-code, pre');
+      if (!code || !navigator.clipboard) return;
+      navigator.clipboard.writeText(code.textContent).then(() => {
+        clearTimeout(copyBtn.copyTimer);
+        setBtn(copyBtn, 'check', 'Copied');
+        copyBtn.copyTimer = setTimeout(() => setBtn(copyBtn, 'copy', 'Copy code'), 1200);
+      }, () => {});
+      return;
+    }
     const btn = e.target.closest('.sandbox-toggle');
     if (!btn) return;
     const fig = btn.closest('.sandbox');
     if (!fig) return;
     const showingCode = fig.getAttribute('data-mode') === 'code';
     fig.setAttribute('data-mode', showingCode ? 'preview' : 'code');
-    const label = showingCode ? 'Show code' : 'Show preview';
-    btn.innerHTML = iconSvg(showingCode ? 'code' : 'eye');
-    btn.title = label;
-    btn.setAttribute('aria-label', label);
+    setBtn(btn, showingCode ? 'code' : 'eye', showingCode ? 'Show code' : 'Show preview');
   };
   if (toggle) document.addEventListener('click', onToggle);
 

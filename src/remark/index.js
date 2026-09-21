@@ -12,11 +12,14 @@ import {
 } from '../core/index.js';
 import { iconSvg, KIND_ICONS } from '../core/icons.js';
 
+const copyButton = `<button class="sandbox-copy" type="button" title="Copy code" aria-label="Copy code">${iconSvg('copy')}</button>`;
+
 const libSummary = (kind, label) =>
   `<summary><span class="sandbox-lib-label">${escapeHtml(label)}</span>` +
   (KIND_ICONS[kind] ?? KIND_ICONS.source)
     .map(([icon, title]) => `<span class="sandbox-lib-tag" title="${title}" aria-label="${title}">${iconSvg(icon, 13)}</span>`)
     .join('') +
+  (kind === 'external' ? '' : copyButton) +
   `</summary>`;
 
 const plainHighlight = (code) => `<pre class="astro-code"><code>${escapeHtml(code)}</code></pre>`;
@@ -99,7 +102,10 @@ export function remarkSandbox({ highlight } = {}) {
           `</div>` +
           (spec.showCode
             ? `<div class="sandbox-code">${codeHtml}</div>` +
-              `<button class="sandbox-toggle" type="button" title="Show code" aria-label="Show code">${iconSvg('code')}</button>`
+              `<div class="sandbox-tools">` +
+              copyButton +
+              `<button class="sandbox-toggle" type="button" title="Show code" aria-label="Show code">${iconSvg('code')}</button>` +
+              `</div>`
             : '') +
           `</figure>`;
         parent.children[index] = { type: 'html', value: html };

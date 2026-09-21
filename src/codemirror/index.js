@@ -60,10 +60,28 @@ function toolBtn(className, label, onClick, icon) {
   return btn;
 }
 
+// The widget hides the fence, so selecting it in the editor is not an option.
+function copyBlock(view, block, btn) {
+  const fence = view.state.doc.sliceString(block.from, block.to);
+  if (!navigator.clipboard) return;
+  const state = (icon, label) => {
+    btn.innerHTML = iconSvg(icon);
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  };
+  navigator.clipboard.writeText(fence).then(() => {
+    clearTimeout(btn.copyTimer);
+    state('check', 'Copied');
+    btn.copyTimer = setTimeout(() => state('copy', 'Copy fence'), 1200);
+  }, () => {});
+}
+
 export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confirm(m) } = {}) {
 
-  function editRemove(view, block) {
+  function blockActions(view, block) {
+    const copy = toolBtn('cm-sbx-btn', 'Copy fence', () => copyBlock(view, block, copy), 'copy');
     return [
+      copy,
       toolBtn('cm-sbx-btn', 'Edit', () => onEdit?.(block), 'pencil'),
       toolBtn('cm-sbx-btn danger', 'Remove', () => {
         if (confirm('Remove this sandbox block?')) removeBlock(view, block.from, block.to);
@@ -100,7 +118,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       actions.className = 'cm-sbx-actions';
       actions.append(
         toolBtn('cm-sbx-btn', 'Show preview', () => view.dispatch({ effects: togglePreview.of(this.index) }), 'eye'),
-        ...editRemove(view, this.block),
+        ...blockActions(view, this.block),
       );
 
       card.append(chips, actions);
@@ -127,7 +145,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       for (const [icon, title] of KIND_ICONS[this.kind] ?? KIND_ICONS.source) chips.appendChild(iconChip(icon, title));
       const actions = document.createElement('div');
       actions.className = 'cm-sbx-actions';
-      actions.append(...editRemove(view, this.block));
+      actions.append(...blockActions(view, this.block));
       card.append(chips, actions);
       return card;
     }
@@ -157,7 +175,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       bar.className = 'cm-sbx-actions cm-sbx-actions-preview';
       bar.append(
         toolBtn('cm-sbx-btn', 'Hide preview', () => view.dispatch({ effects: togglePreview.of(this.index) }), 'eyeOff'),
-        ...editRemove(view, this.block),
+        ...blockActions(view, this.block),
       );
 
       fig.append(stage, bar);
