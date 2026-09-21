@@ -78,6 +78,8 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [split, setSplit] = useState(() => getCodeFenceSetting("splitRatio", 0.5));
   const [dragging, setDragging] = useState(false);
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const modalRef = useRef(null);
   const bodyRef = useRef(null);
   const hostRef = useRef(null);
@@ -87,6 +89,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const clearedRef = useRef(false);
   const persistRef = useRef(null);
   const saveTimer = useRef(null);
+  const settingsRef = useRef(null);
 
   // A block is always js or vue. `viz` is the separate question of whether it is drawn.
   const isFigure = viz !== "";
@@ -232,6 +235,13 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   useEffect(() => { setPlaying(false); }, [frameKey]);
 
   useEffect(() => {
+    if (!settingsOpen) return;
+    const onDown = (e) => { if (!settingsRef.current?.contains(e.target)) setSettingsOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [settingsOpen]);
+
+  useEffect(() => {
     const onMessage = (e) => {
       if (!frameRef.current || frameRef.current.contentWindow !== e.source || !e.data) return;
       if (e.data.__sandboxReset) { setPlaying(false); return; }
@@ -318,6 +328,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
 
   const escapeRef = useRef(null);
   escapeRef.current = () => {
+    if (settingsOpen) { setSettingsOpen(false); return true; }
     if (dirty) return false;
     requestClose();
     return true;
@@ -347,43 +358,59 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
               {VIZ_SURFACES[lang].map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
           </label>
-          <label className="sbx-field">
-            <span>{!isFigure && isVue ? "Component name" : "Label"}</span>
-            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
-          </label>
-          {isFigure && (
-            <>
-              <label className="sbx-field">
-                <span>Size</span>
-                <span className="sbx-size">
-                  <input type="number" min="1" value={w} onChange={(e) => setW(e.target.value)} aria-label="Width" />
-                  <span aria-hidden="true">×</span>
-                  <input type="number" min="1" value={h} onChange={(e) => setH(e.target.value)} aria-label="Height" />
-                </span>
-              </label>
-              <label className="sbx-field">
-                <span>Background</span>
-                <input type="text" value={bg} onChange={(e) => setBg(e.target.value)} />
-              </label>
-              {hasControls && (
-                <label className="sbx-field">
-                  <span>Controls</span>
-                  <select value={control} onChange={(e) => setControl(e.target.value)}>
-                    {CONTROL_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </label>
-              )}
-              <label className="sbx-field">
-                <span>meta</span>
-                <input type="text" value={meta} onChange={(e) => setMeta(e.target.value)} />
-              </label>
-              <div className="sbx-toggles">
-                <label className="sbx-check"><input type="checkbox" checked={showCode} onChange={(e) => setShowCode(e.target.checked)} /> show code</label>
-              </div>
-            </>
-          )}
         </div>
         <div className="sbx-actions">
+          <div className="sbx-settings" ref={settingsRef}>
+            <button
+              className={`sbx-btn sbx-icon ${settingsOpen ? "is-on" : ""}`}
+              onClick={() => setSettingsOpen((o) => !o)}
+              title="Settings"
+              aria-label="Settings"
+              aria-haspopup="dialog"
+              aria-expanded={settingsOpen}
+            >
+              <Icon name="settings" size={17} />
+            </button>
+            {settingsOpen && (
+              <div className="sbx-settings-panel" role="dialog" aria-label="Settings">
+                <label className="sbx-field">
+                  <span>{!isFigure && isVue ? "Component name" : "Label"}</span>
+                  <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
+                </label>
+                {isFigure && (
+                  <>
+                    <label className="sbx-field">
+                      <span>Size</span>
+                      <span className="sbx-size">
+                        <input type="number" min="1" value={w} onChange={(e) => setW(e.target.value)} aria-label="Width" />
+                        <span aria-hidden="true">×</span>
+                        <input type="number" min="1" value={h} onChange={(e) => setH(e.target.value)} aria-label="Height" />
+                      </span>
+                    </label>
+                    <label className="sbx-field">
+                      <span>Background</span>
+                      <input type="text" value={bg} onChange={(e) => setBg(e.target.value)} />
+                    </label>
+                    {hasControls && (
+                      <label className="sbx-field">
+                        <span>Controls</span>
+                        <select value={control} onChange={(e) => setControl(e.target.value)}>
+                          {CONTROL_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </label>
+                    )}
+                    <label className="sbx-field">
+                      <span>meta</span>
+                      <input type="text" value={meta} onChange={(e) => setMeta(e.target.value)} />
+                    </label>
+                    <div className="sbx-toggles">
+                      <label className="sbx-check"><input type="checkbox" checked={showCode} onChange={(e) => setShowCode(e.target.checked)} /> show code</label>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           {!isFigure && dirty && (
             <button className="sbx-btn sbx-icon save" onClick={save} title="Save (⌘S)" aria-label="Save">
               <Icon name="save" size={17} />

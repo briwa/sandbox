@@ -141,6 +141,25 @@
   cursor: pointer;
 }
 .sbx-actions { display: flex; gap: 0.5rem; }
+.sbx-settings { position: relative; }
+.sbx-settings-panel {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 14rem;
+  padding: 0.9rem;
+  background: var(--sbx-surface);
+  border: 1px solid var(--sbx-rule);
+  border-radius: 8px;
+}
+.sbx-settings-panel .sbx-field input,
+.sbx-settings-panel .sbx-field select { box-sizing: border-box; width: 100%; }
+.sbx-settings-panel .sbx-field input[type="number"] { flex: 1 1 0; min-width: 0; }
+.sbx-settings-panel .sbx-toggles { padding-bottom: 0; }
 .sbx-btn {
   display: inline-flex;
   align-items: center;
@@ -156,6 +175,7 @@
 }
 .sbx-btn:hover { border-color: var(--sbx-ink); }
 .sbx-btn.save { color: var(--sbx-accent); border-color: var(--sbx-accent); }
+.sbx-btn.is-on { color: var(--sbx-ink); border-color: var(--sbx-ink); }
 .sbx-btn.sbx-icon { padding: 0.4rem; }
 .sbx-body { flex: 1; display: flex; min-height: 0; }
 .sbx-code-pane {
@@ -294,15 +314,23 @@
   border-radius: 6px;
   background: var(--sbx-surface);
 }
+/* Fixed, the panel is the viewport, so the viewport is what to measure — and
+   this rule must say so, or it stacks an inset panel that has plenty of room
+   just because the window around it is small. */
 @media (max-width: 56rem) {
-  .sbx-body { flex-direction: column; }
-    .sbx-code-pane, .sbx-preview { flex: 1 1 0; }
-  .sbx-code-pane { border-bottom: 1px solid var(--sbx-rule); }
-  .sbx-divider { display: none; }
+  .sbx-modal:not(.is-inline) .sbx-body { flex-direction: column; }
+  .sbx-modal:not(.is-inline) .sbx-code-pane,
+  .sbx-modal:not(.is-inline) .sbx-preview { flex: 1 1 0; }
+  .sbx-modal:not(.is-inline) .sbx-code-pane { border-bottom: 1px solid var(--sbx-rule); }
+  .sbx-modal:not(.is-inline) .sbx-divider { display: none; }
 }
-@container sbx-modal (max-width: 56rem) {
+/* Inline, the panel is narrower than the window by definition, so sharing the
+   viewport's breakpoint stacked it at window widths where it still fit side by
+   side. It stacks on its own width, and only once a split leaves each pane too
+   narrow to work in. */
+@container sbx-modal (max-width: 44rem) {
   .sbx-body { flex-direction: column; }
-    .sbx-code-pane, .sbx-preview { flex: 1 1 0; }
+  .sbx-code-pane, .sbx-preview { flex: 1 1 0; }
   .sbx-code-pane { border-bottom: 1px solid var(--sbx-rule); }
   .sbx-divider { display: none; }
 }
