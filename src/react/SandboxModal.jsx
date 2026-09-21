@@ -29,14 +29,14 @@ const langCompartment = new Compartment();
 
 const langSupport = (name) => (name === "vue" ? vue() : javascript());
 
-function buildPreview({ lang, viz, w, h, bg }, code, siblings) {
+function buildPreview({ lang, viz, w, h, bg, idle }, code, siblings) {
   if (lang === "vue") {
     return buildVueSrcdoc({ w, h, bg }, code, {
       externals: sandboxExternals(siblings),
       components: sandboxVueComponents(siblings),
     });
   }
-  const spec = { preset: viz, w, h, bg, control: 'manual' };
+  const spec = { preset: viz, w, h, bg, control: 'manual', idle };
   return buildSrcdoc(spec, code, sandboxPrelude(siblings), sandboxExternals(siblings));
 }
 
@@ -66,6 +66,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [bg, setBg] = useState(seed.bg || "");
   const [showCode, setShowCode] = useState(Boolean(seed.showCode));
   const [control, setControl] = useState(seed.control || "pausable");
+  const [idle, setIdle] = useState(seed.idle || 0);
   const [meta, setMeta] = useState(seed.meta || "");
   const [label, setLabel] = useState(seed.label || "");
 
@@ -111,7 +112,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     const height = Number(h) || 0;
 
     clearError(cmRef.current);
-    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg() }, body, siblings));
+    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg(), idle: Number(idle) || 0 }, body, siblings));
     setPreviewW(width || 640);
     setPreviewH(height || 360);
     setFrameKey((k) => k + 1);
@@ -121,7 +122,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const persist = () => {
     if (!draftKey || clearedRef.current) return;
     const code = cmRef.current ? cmRef.current.state.doc.toString() : (seed.code || "");
-    saveSandboxDraft(draftKey, { lang, viz, w, h, bg, showCode, control, meta, label, code });
+    saveSandboxDraft(draftKey, { lang, viz, w, h, bg, showCode, control, idle, meta, label, code });
   };
   persistRef.current = persist;
   const scheduleSave = () => {
@@ -205,8 +206,8 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   // fell straight through the guard — so every modal opened already dirty and
   // wrote a recovery draft for an edit nobody had made. Comparing snapshots
   // instead is indifferent to how many times the effect runs.
-  const metaSnapshot = JSON.stringify([lang, viz, w, h, bg, label]);
-  const draftSnapshot = JSON.stringify([lang, viz, w, h, bg, showCode, control, meta, label]);
+  const metaSnapshot = JSON.stringify([lang, viz, w, h, bg, idle, label]);
+  const draftSnapshot = JSON.stringify([lang, viz, w, h, bg, showCode, control, idle, meta, label]);
   const metaSeenRef = useRef(metaSnapshot);
   const draftSeenRef = useRef(draftSnapshot);
 
@@ -315,7 +316,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   function save() {
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     if (isFigure) {
-      const state = { kind: "figure", type: isVue ? "vue" : viz, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, meta, label };
+      const state = { kind: "figure", type: isVue ? "vue" : viz, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, idle: Number(idle) || 0, meta, label };
       onSave(buildSandboxFence(state, body), { keepOpen: true });
       updatePreview();
     } else {
@@ -402,6 +403,12 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
                         <select value={control} onChange={(e) => setControl(e.target.value)}>
                           {CONTROL_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
                         </select>
+                      </label>
+                    )}
+                    {hasControls && (
+                      <label className="sbx-field">
+                        <span>Idle frame</span>
+                        <input type="number" min="0" step="100" value={idle} onChange={(e) => setIdle(e.target.value)} aria-label="Idle frame in milliseconds" />
                       </label>
                     )}
                     <label className="sbx-field">

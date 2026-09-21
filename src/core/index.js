@@ -35,6 +35,7 @@ export function specToToolbar(spec = {}) {
     bg: spec.bg || '',
     showCode: Boolean(spec.showCode),
     control: spec.control || 'pausable',
+    idle: spec.idle || 0,
     meta: spec.meta || '',
     label: spec.componentName || spec.label || '',
   };
@@ -111,7 +112,7 @@ export function describeSandboxBlock(spec = {}) {
 
 const metaValue = (v) => (/[\s"]/.test(v) ? `"${escapeAttr(v)}"` : v);
 
-export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode, control, meta, label, componentName }) {
+export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode, control, idle, meta, label, componentName }) {
   if (kind === 'external') return { lang: 'sandbox=external', meta: label ? `label=${metaValue(label)}` : '' };
 
   const isVue = type === 'vue';
@@ -127,6 +128,7 @@ export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode
   if (bg) tokens.push(`bg=${metaValue(bg)}`);
   if (showCode) tokens.push('code');
   if (control && control !== 'pausable' && !isVue) tokens.push(`control=${control}`);
+  if (idle && !isVue) tokens.push(`idle=${Math.max(0, Number(idle) || 0)}`);
   if (meta) tokens.push(`meta=${metaValue(meta)}`);
   if (label) tokens.push(`label=${metaValue(label)}`);
   return { lang, meta: tokens.join(' ') };
@@ -167,6 +169,7 @@ function tokenizeMeta(meta) {
 
 // ```sandbox=js              shared source, pooled into every figure in the document
 // ```sandbox=js viz           a figure — `viz=svg` / `viz=root` pick the surface
+// ```sandbox=js viz idle=2000  a figure that sits at 2s in until it is played
 // ```sandbox=vue label=Name   a component every vue figure can render
 // ```sandbox=external         https .js URLs, one per line — `label=Name` overrides the derived name
 // Anything else — plain ```js, ```vue — is an ordinary code block we never touch.
@@ -198,8 +201,9 @@ export function parseMeta(lang, meta) {
   const preset = PRESETS.has(values.viz) ? values.viz : 'canvas';
   let control = values.control || (flags.has('auto') ? 'auto' : 'pausable');
   if (!CONTROL_MODES.includes(control)) control = 'pausable';
+  const idle = Math.max(0, Number(values.idle) || 0);
 
-  return { kind: 'figure', lang: 'js', preset, w, h, showCode, bg, control, label, meta: metaText };
+  return { kind: 'figure', lang: 'js', preset, w, h, showCode, bg, control, idle, label, meta: metaText };
 }
 
 export function sandboxPrelude(blocks) {
@@ -292,13 +296,19 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
   return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div id="root"></div>${ext}<script src="${VUE_SRC}"></script><script src="${SFC_LOADER_SRC}"></script><script>${script}</script></body></html>`;
 }
 
-export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude = '', externals = []) {
+export function buildSrcdoc({ preset, w, h, bg, hover, control, idle }, code, prelude = '', externals = []) {
   const isCanvas = preset === 'canvas';
 
   const isRoot = preset === 'root';
   const mode = control || 'pausable';
   const isManual = mode === 'manual';
   const isHover = Boolean(hover) || mode === 'hover';
+  const idleT = Math.max(0, Number(idle) || 0);
+  const idleArg = idleT ? `__idle?${idleT}:0` : '0';
+  const idleVar = idleT ? ',__idle=true' : '';
+  const idleHome = idleT ? '__idle=true;' : '';
+  const leaveIdle = (teardown) =>
+    idleT ? `const __leaveIdle=()=>{if(__idle){__idle=false;${teardown}run()}};` : `const __leaveIdle=()=>{};`;
 
   const pausable = isCanvas && (mode === 'pausable' || mode === 'auto') && !isHover;
   const surface = isCanvas
@@ -357,13 +367,13 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
   const resettable = (isCanvas || isRoot) && !isHover;
 
   const loopDef = isHover
-    ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0;const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(0)};`
+    ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${idleArg})};`
     : isManual
 
-      ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0;const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(0);${resettable ? `__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}};return __stop` : `return ()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}}`}};`
+      ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${idleArg});${resettable ? `__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}};return __stop` : `return ()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}}`}};`
       : pausable
 
-        ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0;const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{if(__stop)__stop();__fn=fn;fn(0);return (__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}})};`
+        ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{if(__stop)__stop();__fn=fn;fn(${idleArg});return (__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}})};`
       : resettable
 
         ? `const loop=(fn)=>{if(__stop)__stop();let id,live=true,t0=null;const t=(ts)=>{if(t0==null)t0=ts;fn(ts-t0);if(live)id=requestAnimationFrame(t)};id=requestAnimationFrame(t);return (__stop=()=>{live=false;cancelAnimationFrame(id)})};`
@@ -372,10 +382,10 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
   const resetVars = resettable ? `let __stop=null,__cleanups=[];` : '';
 
   const resetHome = isManual
-    ? `__el=0;__t0=null;__now=0;__fn=null;run()`
+    ? `${idleHome}__el=0;__t0=null;__now=0;__fn=null;run()`
     : pausable
 
-      ? `__el=0;__t0=null;__now=0;__fn=null;__ctl.hidden=true;run();` + (deferred ? `__play.style.display='flex'` : `__resumeFig()`)
+      ? `${idleHome}__el=0;__t0=null;__now=0;__fn=null;__ctl.hidden=true;run();` + (deferred ? `__play.style.display='flex'` : `__resumeFig()`)
       : deferred
         ? `__play.style.display='flex'`
         : `run()`;
@@ -383,18 +393,20 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
   const resetApi = resettable
     ? `const onCleanup=(fn)=>{__cleanups.push(fn)};` +
       `const __teardown=()=>{if(__stop){__stop();__stop=null}__cleanups.forEach(function(fn){try{fn()}catch(_){}});__cleanups=[];${isCanvas ? 'canvas.width=width' : "root.innerHTML=''"}};` +
-      `const reset=()=>{__teardown();${resetHome};parent.postMessage({__sandboxReset:1},'*')};`
+      `const reset=()=>{__teardown();${resetHome};parent.postMessage({__sandboxReset:1},'*')};` +
+      leaveIdle('__teardown();')
     : isHover
 
-      ? `const onCleanup=()=>{};const reset=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}__el=0;__t0=null;__now=0;__fn=null;run()};`
-      : `const onCleanup=()=>{};const reset=()=>{};`;
+      ? `const onCleanup=()=>{};const reset=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}${idleHome}__el=0;__t0=null;__now=0;__fn=null;run()};` +
+        leaveIdle('')
+      : `const onCleanup=()=>{};const reset=()=>{};` + leaveIdle('');
 
   const pauseControls = pausable
     ? `const __ctl=document.getElementById('__ctl');` +
       `const __ctlContrast=()=>{const c=getComputedStyle(document.body).backgroundColor.match(/[\\d.]+/g);__ctl.classList.toggle('on-dark',!!(c&&(c.length<4||+c[3]>0)&&(0.299*c[0]+0.587*c[1]+0.114*c[2])<128))};__ctlContrast();${bg ? '' : `addEventListener('message',function(e){if(e.data&&e.data.__sbxBg)requestAnimationFrame(__ctlContrast)});`}` +
       `const __pause=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now;__ctl.hidden=false}};` +
 
-      `const __resumeFig=()=>{__ctl.hidden=true;${deferred ? `__play.style.display='none';` : ''}if(__raf==null&&__fn){__t0=null;__raf=requestAnimationFrame(__tick)}};` +
+      `const __resumeFig=()=>{__ctl.hidden=true;${deferred ? `__play.style.display='none';` : ''}__leaveIdle();if(__raf==null&&__fn){__t0=null;__raf=requestAnimationFrame(__tick)}};` +
       `canvas.addEventListener('click',()=>{if(__raf!=null)__pause();else if(__fn)__resumeFig()});` +
       `document.getElementById('__resume').addEventListener('click',e=>{e.stopPropagation();__resumeFig()});` +
       `document.getElementById('__rst').addEventListener('click',e=>{e.stopPropagation();reset()});`
@@ -409,10 +421,10 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control }, code, prelude 
       : playSetup + `__play.addEventListener('click',()=>{__play.style.display='none';start()});report();`
     : isManual
 
-      ? `start();addEventListener('message',function(e){if(!e.data)return;if(e.data.__figpause){if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now}}else if(e.data.__figplay){if(__raf==null&&__fn){__t0=null;__raf=requestAnimationFrame(__tick)}}${resettable ? `else if(e.data.__figreset){reset()}` : ''}});`
+      ? `start();addEventListener('message',function(e){if(!e.data)return;if(e.data.__figpause){if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now}}else if(e.data.__figplay){if(__raf==null&&__fn){__leaveIdle();__t0=null;__raf=requestAnimationFrame(__tick)}}${resettable ? `else if(e.data.__figreset){reset()}` : ''}});`
       : isHover
 
-        ? `start();addEventListener('message',function(e){if(!__fn||!e.data)return;if(e.data.__figplay){if(__raf==null){__t0=null;__raf=requestAnimationFrame(__tick)}}else if('__figplay' in e.data){reset()}});`
+        ? `start();addEventListener('message',function(e){if(!__fn||!e.data)return;if(e.data.__figplay){if(__raf==null){__leaveIdle();__t0=null;__raf=requestAnimationFrame(__tick)}}else if('__figplay' in e.data){reset()}});`
 
         : pauseControls + `start();` + (pausable ? `__resumeFig();` : ``);
   // Everything the srcdoc puts above the user's code is emitted on one line, so a line

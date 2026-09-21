@@ -15,8 +15,8 @@ const WAVE = `loop((t) => {
   }
 });`;
 
-const sample = (control) =>
-  '```sandbox=js viz 460x150 control=' + control + '\n' + WAVE + '\n```';
+const sample = (control, extra = '') =>
+  '```sandbox=js viz 460x150 control=' + control + (extra ? ' ' + extra : '') + '\n' + WAVE + '\n```';
 
 const source = `
 
@@ -41,6 +41,14 @@ ${sample('hover')}
 Controlled by \`playFigure\`, \`pauseFigure\` and \`resetFigure\` from \`@briwa.dev/sandbox/client\`
 
 ${sample('manual')}
+
+## idle
+
+\`idle=<t in ms>\` parks the figure at a given time, and defines the reset point.
+
+${sample('pausable', 'idle=2000')}
+
+${sample('hover', 'idle=2000')}
 `;
 
 const mount = document.querySelector('#controls-prose');
