@@ -363,6 +363,7 @@
   letter-spacing: 0.06em;
   color: var(--sbx-muted);
 }
+.sbx-field-block input[type="text"] { box-sizing: border-box; width: 100%; }
 .sbx-urls {
   font-family: var(--sbx-mono);
   font-size: 0.82rem;

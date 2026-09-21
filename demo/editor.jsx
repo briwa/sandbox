@@ -74,13 +74,13 @@ function Editor() {
   onEditRef.current = (block) => {
     if (editing && editing.from === block.from) return;
     const base = { from: block.from, to: block.to, siblings: siblingsNow(block) };
-    if (block.kind === 'external') setEditing({ ...base, modal: 'external', initial: { code: block.code } });
+    if (block.kind === 'external') setEditing({ ...base, modal: 'external', initial: { code: block.code, label: block.label || '' } });
     else setEditing({ ...base, modal: 'sandbox', initial: { ...specToToolbar(block), code: block.code } });
   };
 
   onCreateRef.current = (kind, pos) => {
     const base = { from: pos, to: pos, siblings: siblingsNow() };
-    if (kind === 'external') return setEditing({ ...base, modal: 'external', initial: { code: '' } });
+    if (kind === 'external') return setEditing({ ...base, modal: 'external', initial: { code: '', label: '' } });
     setEditing({
       ...base,
       modal: 'sandbox',

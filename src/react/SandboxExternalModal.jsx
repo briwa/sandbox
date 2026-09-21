@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon.jsx";
-import { buildSandboxFence, externalName, safeUrl } from "../core/index.js";
+import { buildSandboxFence, externalLabel, externalName, safeUrl } from "../core/index.js";
 import { targetIdentity } from "./target.js";
 
 export default function SandboxExternalModal({ targetKey, initial, ...rest }) {
@@ -9,6 +9,7 @@ export default function SandboxExternalModal({ targetKey, initial, ...rest }) {
 
 function ExternalEditor({ variant = "fixed", className = "", initial, onSave, onCancel }) {
   const [urls, setUrls] = useState(initial.code || "");
+  const [label, setLabel] = useState(initial.label || "");
   const inputRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -23,7 +24,7 @@ function ExternalEditor({ variant = "fixed", className = "", initial, onSave, on
   const bad = lines.filter((u) => !safeUrl(u));
 
   function save() {
-    onSave(buildSandboxFence({ kind: "external" }, good.join("\n")));
+    onSave(buildSandboxFence({ kind: "external", label: label.trim() }, good.join("\n")));
   }
 
   return (
@@ -44,7 +45,16 @@ function ExternalEditor({ variant = "fixed", className = "", initial, onSave, on
             onChange={(e) => setUrls(e.target.value)}
           />
         </label>
-        {good.length > 0 && (
+        <label className="sbx-field sbx-field-block">
+          <span>Label — optional, for when the URL does not name itself</span>
+          <input
+            type="text"
+            value={label}
+            placeholder={good.length ? externalLabel(good.join("\n")) : "external library"}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+        </label>
+        {good.length > 0 && !label.trim() && (
           <p className="sbx-note">Reads as {good.map(externalName).join(", ")}</p>
         )}
         {bad.length > 0 && (

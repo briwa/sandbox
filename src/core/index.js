@@ -91,7 +91,7 @@ export function describeSandboxBlock(spec = {}) {
   const named = firstDeclaration(spec.code);
 
   if (spec.kind === 'external') {
-    const label = externalLabel(spec.code);
+    const label = spec.label || externalLabel(spec.code);
     return { kind: 'external', label, detail: detailOf(label, 'external library') };
   }
   if (spec.kind === 'source') {
@@ -112,7 +112,7 @@ export function describeSandboxBlock(spec = {}) {
 const metaValue = (v) => (/[\s"]/.test(v) ? `"${escapeAttr(v)}"` : v);
 
 export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode, control, meta, label, componentName }) {
-  if (kind === 'external') return { lang: 'sandbox=external', meta: '' };
+  if (kind === 'external') return { lang: 'sandbox=external', meta: label ? `label=${metaValue(label)}` : '' };
 
   const isVue = type === 'vue';
   const lang = isVue ? 'sandbox=vue' : 'sandbox=js';
@@ -168,15 +168,16 @@ function tokenizeMeta(meta) {
 // ```sandbox=js              shared source, pooled into every figure in the document
 // ```sandbox=js viz           a figure — `viz=svg` / `viz=root` pick the surface
 // ```sandbox=vue label=Name   a component every vue figure can render
-// ```sandbox=external         https .js URLs, one per line
+// ```sandbox=external         https .js URLs, one per line — `label=Name` overrides the derived name
 // Anything else — plain ```js, ```vue — is an ordinary code block we never touch.
 export function parseMeta(lang, meta) {
   const dialect = /^sandbox=(js|vue|external)$/.exec((lang || '').trim())?.[1];
   if (!dialect) return null;
-  if (dialect === 'external') return { kind: 'external', lang: 'external' };
 
   const { flags, values, has } = tokenizeMeta(meta);
   const label = values.label || '';
+  // A CDN URL usually names itself, but a raw gist is a hash: `label` is the way out.
+  if (dialect === 'external') return { kind: 'external', lang: 'external', label };
   const isVue = dialect === 'vue';
 
   if (!has('viz')) {
