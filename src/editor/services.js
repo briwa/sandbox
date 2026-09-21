@@ -1,5 +1,5 @@
 import { EditorView, keymap } from "@codemirror/view";
-import { history, historyKeymap, defaultKeymap, indentMore, indentLess } from "@codemirror/commands";
+import { history, historyKeymap, defaultKeymap, indentMore, indentLess, redo } from "@codemirror/commands";
 import { indentUnit, indentOnInput } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { editorFind } from "./find.js";
@@ -10,7 +10,7 @@ const tabIndent = ({ state, dispatch }) => {
   return true;
 };
 
-export const codeKeybindings = [...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, { key: "Tab", run: tabIndent, shift: indentLess }];
+export const codeKeybindings = [...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, { key: "Mod-y", run: redo, preventDefault: true }, { key: "Tab", run: tabIndent, shift: indentLess }];
 
 export function codeServices(extraKeys = []) {
   return [
