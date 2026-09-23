@@ -433,28 +433,27 @@
 .sbx-console-head {
   flex: none;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0 0.25rem;
+  align-items: stretch;
   min-height: 26px;
 }
+.sbx-console-head:hover { background: var(--sbx-hover); }
 .sbx-console.is-open .sbx-console-head { border-bottom: 1px solid var(--sbx-rule); }
-.sbx-console-head .sbx-ctl { border: none; padding: 0.2rem; color: var(--sbx-muted); }
+.sbx-console-head .sbx-ctl { align-self: center; margin-right: 0.25rem; border: none; padding: 0.2rem; color: var(--sbx-muted); }
 .sbx-console-head .sbx-ctl:hover { color: var(--sbx-ink); }
 .sbx-console-toggle {
-  display: inline-flex;
+  flex: 1;
+  display: flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.15rem 0.3rem;
+  padding: 0 0.55rem;
   font: inherit;
   color: var(--sbx-muted);
   background: none;
   border: none;
-  border-radius: 4px;
   cursor: pointer;
+  text-align: left;
 }
-.sbx-console-toggle:hover { color: var(--sbx-ink); background: var(--sbx-hover); }
+.sbx-console-head:hover .sbx-console-toggle { color: var(--sbx-ink); }
 .sbx-console-count { color: var(--sbx-muted); }
 .sbx-console-list {
   flex: 1 1 0;
