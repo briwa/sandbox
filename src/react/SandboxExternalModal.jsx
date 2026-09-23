@@ -46,7 +46,7 @@ function ExternalEditor({ variant = "fixed", className = "", initial, onSave, on
           />
         </label>
         <label className="sbx-field sbx-field-block">
-          <span>Label — optional, for when the URL does not name itself</span>
+          <span>Label — optional</span>
           <input
             type="text"
             value={label}
