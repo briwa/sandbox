@@ -35,7 +35,7 @@ export default function PreviewConsole({ logs, onClear }) {
     <div className={`sbx-console ${open ? "is-open" : ""}`}>
       <div className="sbx-console-head">
         <button className="sbx-console-toggle" onClick={toggle} aria-expanded={open} title={open ? "Hide console" : "Show console"}>
-          <Icon name={open ? "chevronDown" : "chevronUp"} size={12} />
+          <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />
           <span>Console</span>
           {logs.length > 0 && <span className="sbx-console-count">({logs.length})</span>}
         </button>
