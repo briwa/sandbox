@@ -16,6 +16,8 @@ export function appendConsole(prev, entries) {
 
 export default function PreviewConsole({ logs, onClear }) {
   const [open, setOpen] = useState(() => getCodeFenceSetting("consoleOpen", false));
+  const [height, setHeight] = useState(() => getCodeFenceSetting("consoleHeight", 160));
+  const rootRef = useRef(null);
   const listRef = useRef(null);
   const pinnedRef = useRef(true);
 
@@ -26,13 +28,43 @@ export default function PreviewConsole({ logs, onClear }) {
     if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
   }, [logs, open]);
 
+  function startResize(e) {
+    e.preventDefault();
+    const pane = rootRef.current?.parentElement;
+    if (!pane) return;
+    pane.classList.add("sbx-dragging", "is-rows");
+    let next = height;
+    const move = (ev) => {
+      const rect = pane.getBoundingClientRect();
+      next = Math.round(Math.min(rect.height - 80, Math.max(60, rect.bottom - ev.clientY)));
+      setHeight(next);
+    };
+    const up = () => {
+      pane.classList.remove("sbx-dragging", "is-rows");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setCodeFenceSetting("consoleHeight", next);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
   const onScroll = () => {
     const el = listRef.current;
     if (el) pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
   };
 
   return (
-    <div className={`sbx-console ${open ? "is-open" : ""}`}>
+    <div ref={rootRef} className={`sbx-console ${open ? "is-open" : ""}`} style={open ? { height } : undefined}>
+      {open && (
+        <div
+          className="sbx-console-resize"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize console"
+          onPointerDown={startResize}
+        />
+      )}
       <div className="sbx-console-head">
         <button className="sbx-console-toggle" onClick={toggle} aria-expanded={open} title={open ? "Hide console" : "Show console"}>
           <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />

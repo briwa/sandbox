@@ -400,16 +400,36 @@
 }
 
 .sbx-console {
+  position: relative;
   flex: none;
   display: flex;
   flex-direction: column;
-  max-height: 45%;
+  max-height: calc(100% - 80px);
   border-top: 1px solid var(--sbx-rule);
   background: var(--sbx-surface);
   font-family: var(--sbx-mono);
   font-size: 11px;
   line-height: 1.45;
 }
+.sbx-console-resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 7px;
+  z-index: 2;
+  cursor: row-resize;
+  touch-action: none;
+}
+.sbx-console-resize::before {
+  content: "";
+  position: absolute;
+  inset: 3px 0;
+  transition: background 0.12s;
+}
+.sbx-console-resize:hover::before { background: var(--sbx-ink); }
+.sbx-dragging.is-rows { cursor: row-resize; }
+.sbx-dragging.is-rows .sbx-console-resize::before { background: var(--sbx-accent); }
 .sbx-console-head {
   flex: none;
   display: flex;
@@ -437,9 +457,8 @@
 .sbx-console-toggle:hover { color: var(--sbx-ink); background: var(--sbx-hover); }
 .sbx-console-count { color: var(--sbx-muted); }
 .sbx-console-list {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
-  height: 9rem;
   overflow: auto;
   overscroll-behavior: contain;
 }
