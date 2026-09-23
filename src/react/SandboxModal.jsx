@@ -6,6 +6,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { vue } from "@codemirror/lang-vue";
 import Icon from "./Icon.jsx";
 import EditorFind from "./EditorFind.jsx";
+import PreviewConsole, { appendConsole } from "./PreviewConsole.jsx";
 import { codeServices } from "../editor/services.js";
 import { showError, clearError } from "../editor/errors.js";
 import { figureBg } from "../client/index.js";
@@ -15,6 +16,7 @@ import { targetIdentity } from "./target.js";
 import { getCodeFenceSetting, setCodeFenceSetting } from "./storage.js";
 import {
   MSG_ERROR,
+  MSG_CONSOLE,
   VIZ_SURFACES,
   CONTROL_MODES,
   buildSandboxFence,
@@ -34,9 +36,10 @@ function buildPreview({ lang, viz, w, h, bg, idle }, code, siblings) {
     return buildVueSrcdoc({ w, h, bg }, code, {
       externals: sandboxExternals(siblings),
       components: sandboxVueComponents(siblings),
+      console: true,
     });
   }
-  const spec = { preset: viz, w, h, bg, control: 'manual', idle };
+  const spec = { preset: viz, w, h, bg, control: 'manual', idle, console: true };
   return buildSrcdoc(spec, code, sandboxPrelude(siblings), sandboxExternals(siblings));
 }
 
@@ -74,6 +77,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [previewW, setPreviewW] = useState(initial.w || 640);
   const [previewH, setPreviewH] = useState(initial.h || 360);
   const [playing, setPlaying] = useState(false);
+  const [logs, setLogs] = useState([]);
 
   const [frameKey, setFrameKey] = useState(0);
   const [dirty, setDirty] = useState(false);
@@ -236,7 +240,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     return () => { clearTimeout(saveTimer.current); window.removeEventListener("pagehide", flush); };
   }, []);
 
-  useEffect(() => { setPlaying(false); }, [frameKey]);
+  useEffect(() => { setPlaying(false); setLogs([]); }, [frameKey]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -249,8 +253,14 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     const onMessage = (e) => {
       if (!frameRef.current || frameRef.current.contentWindow !== e.source || !e.data) return;
       if (e.data.__sandboxReset) { setPlaying(false); return; }
+      const out = e.data[MSG_CONSOLE];
+      if (Array.isArray(out)) { setLogs((prev) => appendConsole(prev, out)); return; }
       const err = e.data[MSG_ERROR];
-      if (err) { showError(cmRef.current, err); return; }
+      if (err) {
+        showError(cmRef.current, err);
+        setLogs((prev) => appendConsole(prev, [{ text: String(err.message) }]));
+        return;
+      }
       const height = e.data.__sandboxHeight;
       if (typeof height !== "number" || height <= 0) return;
 
@@ -290,6 +300,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
 
   function resetFrame() {
     clearError(cmRef.current);
+    setLogs([]);
     frameRef.current?.contentWindow?.postMessage({ __figreset: true }, "*");
   }
 
@@ -467,25 +478,28 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
         )}
         {isFigure && (
           <div className="sbx-preview">
-            {hasPreviewControls && (
-              <div className="sbx-controls" role="toolbar" aria-label="Preview controls">
-                <button className="sbx-ctl sbx-icon" onClick={togglePlay} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
-                  <Icon name={playing ? "pause" : "play"} size={16} />
-                </button>
-                <button className="sbx-ctl sbx-icon" onClick={resetFrame} title="Restart the preview" aria-label="Restart the preview">
-                  <Icon name="reset" size={16} />
-                </button>
-              </div>
-            )}
-            <iframe
-              key={frameKey}
-              ref={frameRef}
-              className="sbx-frame"
-              style={{ width: `${previewW}px`, maxWidth: "100%", aspectRatio: `${previewW} / ${previewH}` }}
-              sandbox="allow-scripts"
-              title="live figure preview"
-              srcDoc={srcdoc}
-            />
+            <div className="sbx-preview-stage">
+              {hasPreviewControls && (
+                <div className="sbx-controls" role="toolbar" aria-label="Preview controls">
+                  <button className="sbx-ctl sbx-icon" onClick={togglePlay} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
+                    <Icon name={playing ? "pause" : "play"} size={16} />
+                  </button>
+                  <button className="sbx-ctl sbx-icon" onClick={resetFrame} title="Restart the preview" aria-label="Restart the preview">
+                    <Icon name="reset" size={16} />
+                  </button>
+                </div>
+              )}
+              <iframe
+                key={frameKey}
+                ref={frameRef}
+                className="sbx-frame"
+                style={{ width: `${previewW}px`, maxWidth: "100%", aspectRatio: `${previewW} / ${previewH}` }}
+                sandbox="allow-scripts"
+                title="live figure preview"
+                srcDoc={srcdoc}
+              />
+            </div>
+            <PreviewConsole logs={logs} onClear={() => setLogs([])} />
           </div>
         )}
       </div>

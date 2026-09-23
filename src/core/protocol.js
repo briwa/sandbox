@@ -11,3 +11,5 @@ export const MSG_VISIBLE = '__figvis';
 export const MSG_PLAY = '__figplay';
 export const MSG_PAUSE = '__figpause';
 export const MSG_RESET = '__figreset';
+
+export const MSG_CONSOLE = '__sandboxConsole';

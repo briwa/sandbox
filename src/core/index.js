@@ -18,6 +18,33 @@ const VIS_GATE =
   `addEventListener('visibilitychange',()=>{__gVis=!document.hidden;__wake()});` +
   `addEventListener('message',(e)=>{if(e.data&&'__figvis'in e.data){__gHost=!!e.data.__figvis;__wake()}});`;
 
+const CONSOLE_HOOK =
+  `(()=>{const __c=window.console,__q=[];let __qd=false;` +
+  `const __flush=()=>{__qd=false;if(__q.length)parent.postMessage({__sandboxConsole:__q.splice(0)},'*')};` +
+  `window.__sbxFlushConsole=__flush;` +
+  `const __str=(v,d,seen)=>{const t=typeof v;` +
+    `if(t==='string')return d?JSON.stringify(v):v;` +
+    `if(t==='function')return 'ƒ '+(v.name||'anonymous')+'()';` +
+    `if(t==='symbol'||t==='bigint'||v==null||t!=='object')return String(v)+(t==='bigint'?'n':'');` +
+    `if(v instanceof Error)return v.stack||String(v);` +
+    `if(typeof Node!=='undefined'&&v instanceof Node)return v.nodeType===1?'<'+v.tagName.toLowerCase()+(v.id?'#'+v.id:'')+'>':v.nodeName;` +
+    `if(seen.has(v))return '[Circular]';if(d>2)return Array.isArray(v)?'[…]':'{…}';seen.add(v);` +
+    `try{if(Array.isArray(v)||ArrayBuffer.isView(v)){const a=Array.from(v.length>100?Array.prototype.slice.call(v,0,100):v,x=>__str(x,d+1,seen));if(v.length>100)a.push('… '+(v.length-100)+' more');return (Array.isArray(v)?'':v.constructor.name+' ')+'['+a.join(', ')+']'}` +
+    `if(v instanceof Map)return 'Map('+v.size+') {'+Array.from(v,([k,x])=>__str(k,d+1,seen)+' => '+__str(x,d+1,seen)).join(', ')+'}';` +
+    `if(v instanceof Set)return 'Set('+v.size+') {'+Array.from(v,x=>__str(x,d+1,seen)).join(', ')+'}';` +
+    `if(v instanceof Date)return v.toISOString();if(v instanceof RegExp)return String(v);` +
+    `const ks=Object.keys(v),n=v.constructor&&v.constructor!==Object?v.constructor.name+' ':'';` +
+    `return n+'{'+ks.slice(0,50).map(k=>(/^[A-Za-z_$][\\w$]*$/.test(k)?k:JSON.stringify(k))+': '+__str(v[k],d+1,seen)).concat(ks.length>50?['…']:[]).join(', ')+'}'}` +
+    `finally{seen.delete(v)}};` +
+  `const __push=(level,args)=>{let text=Array.from(args,a=>{try{return __str(a,0,new Set())}catch(_){return String(a)}}).join(' ');` +
+    `if(text.length>4000)text=text.slice(0,4000)+'…';__q.push({level,text});if(!__qd){__qd=true;queueMicrotask(__flush)}};` +
+  `Object.keys(__c).forEach(level=>{const orig=__c[level];if(typeof orig!=='function'||level==='clear')return;` +
+    `__c[level]=function(){if(level==='assert'){if(arguments[0])return;__push(level,Array.prototype.slice.call(arguments,1))}else __push(level,arguments);return orig.apply(__c,arguments)}});` +
+  `const __clear=__c.clear;__c.clear=function(){__q.length=0;__push('clear',[]);return __clear&&__clear.apply(__c,arguments)};` +
+  `})();`;
+
+const consoleScript = (on) => (on ? `<script>${CONSOLE_HOOK}</script>` : '');
+
 // Who drives playback. The last two hand that job to the host page: `manual` waits for
 // play/pause/reset messages, `hover` runs only while the host says the pointer is on it.
 export const CONTROL_MODES = ['pausable', 'auto', 'none', 'manual', 'hover'];
@@ -257,7 +284,7 @@ export const escapeTemplate = (s) =>
     .replace(/<\/script>/gi, '<\\/script>') +
   '`';
 
-export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components = [] } = {}) {
+export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components = [], console: captureConsole = false } = {}) {
 
   const fetched = (externals || []).filter(isRawGistUrl);
   const ext = (externals || [])
@@ -291,12 +318,12 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
       ? `const __fx=[${fetched.map((u) => JSON.stringify(u)).join(',')}];` +
         `const __loadExt=async()=>{for(const u of __fx){const r=await fetch(u);if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);const s=document.createElement('script');s.textContent=await r.text();document.head.appendChild(s)}};`
       : `const __loadExt=async()=>{};`) +
-    `(async()=>{try{await __loadExt();const app=Vue.createApp(await loadModule('/__main__.vue',opts));${regs}app.mount(root)}catch(e){const m=String(e&&e.stack||e);document.body.innerHTML='<pre class=err>'+m+'</pre>';parent.postMessage({__sandboxError:{message:m}},'*')}report()})();`;
+    `(async()=>{try{await __loadExt();const app=Vue.createApp(await loadModule('/__main__.vue',opts));${regs}app.mount(root)}catch(e){const m=String(e&&e.stack||e);document.body.innerHTML='<pre class=err>'+m+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();parent.postMessage({__sandboxError:{message:m}},'*')}report()})();`;
 
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div id="root"></div>${ext}<script src="${VUE_SRC}"></script><script src="${SFC_LOADER_SRC}"></script><script>${script}</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>${consoleScript(captureConsole)}</head><body><div id="root"></div>${ext}<script src="${VUE_SRC}"></script><script src="${SFC_LOADER_SRC}"></script><script>${script}</script></body></html>`;
 }
 
-export function buildSrcdoc({ preset, w, h, bg, hover, control, idle }, code, prelude = '', externals = []) {
+export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: captureConsole }, code, prelude = '', externals = []) {
   const isCanvas = preset === 'canvas';
 
   const isRoot = preset === 'root';
@@ -440,7 +467,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle }, code, pr
       `for(const hit of hits){const p=/^(.*):(\\d+):(\\d+)$/.exec(hit);if(!__own(p[1]))continue;return{line:+p[2]-__base,col:+p[3]}}return null};` +
     `const __evLoc=(e)=>e.lineno&&__own(e.filename)?{line:e.lineno-__base,col:e.colno||0}:__pick(e.error&&e.error.stack);` +
     `const showErr=(m,loc)=>{const hint=loc&&loc.line<1?'Thrown in a shared source block.\\n\\n':'';` +
-      `document.body.innerHTML='<pre class=err>'+hint+m+'</pre>';` +
+      `document.body.innerHTML='<pre class=err>'+hint+m+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();` +
       `parent.postMessage({__sandboxError:{message:String(m),line:loc&&loc.line,col:loc&&loc.col}},'*');report()};` +
     `addEventListener('error',e=>showErr((e.error&&e.error.stack)||e.message,__evLoc(e)));` +
     `addEventListener('unhandledrejection',e=>showErr((e.reason&&e.reason.stack)||e.reason,__pick(e.reason&&e.reason.stack)));`;
@@ -460,7 +487,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle }, code, pr
     loadExt +
     tail;
 
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${surface}${playBtn}${ctlOverlay}${ext}<script>${script}</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>${consoleScript(captureConsole)}</head><body>${surface}${playBtn}${ctlOverlay}${ext}<script>${script}</script></body></html>`;
 }
 
 export function findSandboxBlocks(src) {
