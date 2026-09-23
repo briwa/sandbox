@@ -461,6 +461,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const lineBase = 1 + String(prelude).split('\n').length;
 
   const errorReporting =
+    `const report=()=>parent.postMessage({__sandboxHeight:document.body.scrollHeight},'*');` +
     `const __base=${lineBase};` +
     `const __own=(f)=>!/^(https?|blob):/.test(f||'');` +
     `const __pick=(s)=>{const hits=String(s||'').match(/[^\\s()]+:\\d+:\\d+/g)||[];` +
@@ -478,16 +479,13 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     resetVars +
     loopDef +
     resetApi +
-    `const report=()=>parent.postMessage({__sandboxHeight:document.body.scrollHeight},'*');` +
     `new ResizeObserver(report).observe(document.documentElement);` +
     themeSync +
-
-    errorReporting +
     `const run=()=>{try{\n${prelude}\n${code}\n}catch(e){showErr(e&&e.stack||e,__pick(e&&e.stack));return}report()};` +
     loadExt +
     tail;
 
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>${consoleScript(captureConsole)}</head><body>${surface}${playBtn}${ctlOverlay}${ext}<script>${script}</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>${consoleScript(captureConsole)}</head><body>${surface}${playBtn}${ctlOverlay}${ext}<script>${errorReporting}</script><script>${script}</script></body></html>`;
 }
 
 export function findSandboxBlocks(src) {
