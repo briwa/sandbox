@@ -101,16 +101,39 @@
    has to measure the panel. Fixed, the two are the same width and it stays a
    media query — a container query on the whole thing would be a no-op there. */
 .sbx-modal.is-inline { container: sbx-modal / inline-size; }
-.sbx-head {
+.sbx-float {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 30;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--sbx-rule);
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.2rem;
+  background: var(--sbx-surface);
+  border: 1px solid var(--sbx-rule);
+  border-radius: 8px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
 }
-.sbx-toolbar { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0.9rem; }
+.sbx-float-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-width: 1.85rem;
+  height: 1.85rem;
+  padding: 0 0.35rem;
+  color: var(--sbx-muted);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.sbx-float-btn:hover { color: var(--sbx-ink); background: var(--sbx-hover); }
+.sbx-float-btn.is-on { color: var(--sbx-ink); }
+.sbx-float-btn.save { color: var(--sbx-surface); background: var(--sbx-accent); }
+.sbx-float-btn.save:hover { opacity: 0.9; }
+.sbx-kind { border-right: 1px solid var(--sbx-rule); border-radius: 6px 0 0 6px; margin-right: 0.3rem; }
 .sbx-field { display: flex; flex-direction: column; gap: 0.25rem; }
 .sbx-field > span {
   font-size: 0.68rem;
@@ -141,7 +164,7 @@
   cursor: pointer;
 }
 .sbx-actions { display: flex; gap: 0.5rem; }
-.sbx-settings { position: relative; }
+.sbx-settings { position: relative; display: flex; }
 .sbx-settings-panel {
   position: absolute;
   top: calc(100% + 0.45rem);
@@ -208,26 +231,6 @@
 }
 .sbx-code .cm-editor { height: 100%; }
 
-.sbx-save-fab {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.4rem;
-  color: var(--sbx-surface);
-  background: var(--sbx-accent);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--sbx-ink) 30%, transparent);
-  opacity: 0.92;
-  transition: opacity 0.15s, transform 0.15s;
-}
-.sbx-save-fab:hover { opacity: 1; transform: translateY(-1px); }
-
 .editor-find {
   z-index: 25;
   display: flex;
@@ -240,7 +243,7 @@
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
 }
 .sbx-code-pane .editor-find { position: absolute; top: 0.5rem; right: 0.5rem; }
-.sbx-code-pane .editor-find ~ .sbx-save-fab { top: 3rem; }
+.sbx-body-solo .sbx-code-pane .editor-find { top: 3rem; }
 .editor-find-input {
   width: 11rem;
   max-width: 40vw;
@@ -288,17 +291,18 @@
   flex-direction: column;
   background: color-mix(in srgb, var(--sbx-ink) 2%, transparent);
 }
+.sbx-preview[hidden] { display: none; }
 .sbx-preview-stage {
   flex: 1 1 0;
   min-height: 0;
   overflow: auto;
-  padding: 1rem;
+  padding: 4rem 1rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
 }
-.sbx-controls { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+.sbx-controls { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 .sbx-ctl {
   font: inherit;
   font-size: 0.78rem;
@@ -330,6 +334,7 @@
   .sbx-modal:not(.is-inline) .sbx-preview { flex: 1 1 0; }
   .sbx-modal:not(.is-inline) .sbx-code-pane { border-bottom: 1px solid var(--sbx-rule); }
   .sbx-modal:not(.is-inline) .sbx-divider { display: none; }
+  .sbx-modal:not(.is-inline) .sbx-code-pane .editor-find { top: 3rem; }
 }
 /* Inline, the panel is narrower than the window by definition, so sharing the
    viewport's breakpoint stacked it at window widths where it still fit side by
@@ -340,6 +345,7 @@
   .sbx-code-pane, .sbx-preview { flex: 1 1 0; }
   .sbx-code-pane { border-bottom: 1px solid var(--sbx-rule); }
   .sbx-divider { display: none; }
+  .sbx-code-pane .editor-find { top: 3rem; }
 }
 
 .sbx-overlay {

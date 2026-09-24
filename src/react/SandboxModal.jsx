@@ -86,6 +86,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [dragging, setDragging] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(() => getCodeFenceSetting("previewOpen", true));
 
   const modalRef = useRef(null);
   const bodyRef = useRef(null);
@@ -108,6 +109,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   // and the reset overlay, root gets the play button and reset. svg draws once and vue is
   // mounted by its own runtime, so `control` has nothing to act on.
   const hasControls = isFigure && !isVue && (viz === "canvas" || viz === "root");
+  const showPreview = isFigure && previewOpen;
 
   function updatePreview() {
     if (!isFigure) return;
@@ -298,6 +300,11 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     setPlaying(!playing);
   }
 
+  function togglePreview() {
+    setPreviewOpen(!previewOpen);
+    setCodeFenceSetting("previewOpen", !previewOpen);
+  }
+
   function resetFrame() {
     clearError(cmRef.current);
     setLogs([]);
@@ -359,95 +366,104 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
       aria-modal={isInline ? undefined : "true"}
       aria-label={isFigure ? "Edit sandbox figure" : "Edit shared source"}
     >
-      <div className="sbx-head">
-        <div className="sbx-toolbar">
-          <label className="sbx-field">
-            <span>Language</span>
-            <select value={lang} onChange={(e) => setLang(e.target.value)}>
-              <option value="js">js</option>
-              <option value="vue">vue</option>
-            </select>
-          </label>
-          <label className="sbx-field">
-            <span>Visualize</span>
-            <select value={viz} onChange={(e) => setViz(e.target.value)}>
-              <option value="">no</option>
-              {VIZ_SURFACES[lang].map((v) => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </label>
-        </div>
-        <div className="sbx-actions">
-          <div className="sbx-settings" ref={settingsRef}>
-            <button
-              className={`sbx-btn sbx-icon ${settingsOpen ? "is-on" : ""}`}
-              onClick={() => setSettingsOpen((o) => !o)}
-              title="Settings"
-              aria-label="Settings"
-              aria-haspopup="dialog"
-              aria-expanded={settingsOpen}
-            >
-              <Icon name="settings" size={17} />
-            </button>
-            {settingsOpen && (
-              <div className="sbx-settings-panel" role="dialog" aria-label="Settings">
-                <label className="sbx-field">
-                  <span>{!isFigure && isVue ? "Component name" : "Label"}</span>
-                  <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
-                </label>
-                {isFigure && (
-                  <>
-                    <label className="sbx-field">
-                      <span>Size</span>
-                      <span className="sbx-size">
-                        <input type="number" min="1" value={w} onChange={(e) => setW(e.target.value)} aria-label="Width" />
-                        <span aria-hidden="true">×</span>
-                        <input type="number" min="1" value={h} onChange={(e) => setH(e.target.value)} aria-label="Height" />
-                      </span>
-                    </label>
-                    <label className="sbx-field">
-                      <span>Background</span>
-                      <input type="text" value={bg} onChange={(e) => setBg(e.target.value)} />
-                    </label>
-                    {hasControls && (
-                      <label className="sbx-field">
-                        <span>Controls</span>
-                        <select value={control} onChange={(e) => setControl(e.target.value)}>
-                          {CONTROL_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                      </label>
-                    )}
-                    {hasControls && (
-                      <label className="sbx-field">
-                        <span>Idle frame</span>
-                        <input type="number" min="0" step="100" value={idle} onChange={(e) => setIdle(e.target.value)} aria-label="Idle frame in milliseconds" />
-                      </label>
-                    )}
-                    <label className="sbx-field">
-                      <span>meta</span>
-                      <input type="text" value={meta} onChange={(e) => setMeta(e.target.value)} />
-                    </label>
-                    <div className="sbx-toggles">
-                      <label className="sbx-check"><input type="checkbox" checked={showCode} onChange={(e) => setShowCode(e.target.checked)} /> show code</label>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-          {!isFigure && dirty && (
-            <button className="sbx-btn sbx-icon save" onClick={save} title="Save (⌘S)" aria-label="Save">
-              <Icon name="save" size={17} />
-            </button>
-          )}
-          <button className="sbx-btn sbx-icon" onClick={requestClose} title="Close" aria-label="Close">
-            <Icon name="close" size={17} />
+      <div className="sbx-float" role="toolbar" aria-label="Editor actions">
+        <div className="sbx-settings" ref={settingsRef}>
+          <button
+            className={`sbx-float-btn sbx-kind ${settingsOpen ? "is-on" : ""}`}
+            onClick={() => setSettingsOpen((o) => !o)}
+            title={`Settings — ${lang}${isFigure ? ` · ${viz}` : ""}`}
+            aria-label="Settings"
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+          >
+            <Icon name={lang} size={15} />
+            {isFigure && <Icon name={viz} size={15} />}
+            <Icon name="chevronDown" size={12} />
           </button>
+          {settingsOpen && (
+            <div className="sbx-settings-panel" role="dialog" aria-label="Settings">
+              <label className="sbx-field">
+                <span>Language</span>
+                <select value={lang} onChange={(e) => setLang(e.target.value)}>
+                  <option value="js">js</option>
+                  <option value="vue">vue</option>
+                </select>
+              </label>
+              <label className="sbx-field">
+                <span>Visualize</span>
+                <select value={viz} onChange={(e) => setViz(e.target.value)}>
+                  <option value="">no</option>
+                  {VIZ_SURFACES[lang].map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </label>
+              <label className="sbx-field">
+                <span>{!isFigure && isVue ? "Component name" : "Label"}</span>
+                <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
+              </label>
+              {isFigure && (
+                <>
+                  <label className="sbx-field">
+                    <span>Size</span>
+                    <span className="sbx-size">
+                      <input type="number" min="1" value={w} onChange={(e) => setW(e.target.value)} aria-label="Width" />
+                      <span aria-hidden="true">×</span>
+                      <input type="number" min="1" value={h} onChange={(e) => setH(e.target.value)} aria-label="Height" />
+                    </span>
+                  </label>
+                  <label className="sbx-field">
+                    <span>Background</span>
+                    <input type="text" value={bg} onChange={(e) => setBg(e.target.value)} />
+                  </label>
+                  {hasControls && (
+                    <label className="sbx-field">
+                      <span>Controls</span>
+                      <select value={control} onChange={(e) => setControl(e.target.value)}>
+                        {CONTROL_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {hasControls && (
+                    <label className="sbx-field">
+                      <span>Idle frame</span>
+                      <input type="number" min="0" step="100" value={idle} onChange={(e) => setIdle(e.target.value)} aria-label="Idle frame in milliseconds" />
+                    </label>
+                  )}
+                  <label className="sbx-field">
+                    <span>meta</span>
+                    <input type="text" value={meta} onChange={(e) => setMeta(e.target.value)} />
+                  </label>
+                  <div className="sbx-toggles">
+                    <label className="sbx-check"><input type="checkbox" checked={showCode} onChange={(e) => setShowCode(e.target.checked)} /> show code</label>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
+        {dirty && (
+          <button className="sbx-float-btn save" onClick={save} title="Save (⌘S)" aria-label="Save">
+            <Icon name="save" size={15} />
+          </button>
+        )}
+        {isFigure && (
+          <button
+            className={`sbx-float-btn ${previewOpen ? "is-on" : ""}`}
+            onClick={togglePreview}
+            title={previewOpen ? "Hide preview" : "Show preview"}
+            aria-label="Preview"
+            aria-pressed={previewOpen}
+          >
+            <Icon name={previewOpen ? "eye" : "eyeOff"} size={15} />
+          </button>
+        )}
+        <button className="sbx-float-btn" onClick={requestClose} title="Close" aria-label="Close">
+          <Icon name="close" size={15} />
+        </button>
       </div>
       <div
         ref={bodyRef}
-        className={`sbx-body ${isFigure ? "" : "sbx-body-solo"} ${dragging ? "sbx-dragging" : ""}`}
-        style={isFigure ? { "--sbx-code-grow": split, "--sbx-prev-grow": 1 - split } : undefined}
+        className={`sbx-body ${showPreview ? "" : "sbx-body-solo"} ${dragging ? "sbx-dragging" : ""}`}
+        style={showPreview ? { "--sbx-code-grow": split, "--sbx-prev-grow": 1 - split } : undefined}
       >
         <div className="sbx-code-pane">
           <div className="sbx-code" ref={hostRef} />
@@ -456,18 +472,8 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
               editor behind it has a find bar of its own that would otherwise
               answer the same keystroke. */}
           <EditorFind viewRef={cmRef} scopeRef={modalRef} />
-          {isFigure && dirty && (
-            <button
-              className="sbx-save-fab"
-              onClick={save}
-              title="Save (⌘S)"
-              aria-label="Save"
-            >
-              <Icon name="save" size={16} />
-            </button>
-          )}
         </div>
-        {isFigure && (
+        {showPreview && (
           <div
             className="sbx-divider"
             role="separator"
@@ -477,8 +483,17 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
           />
         )}
         {isFigure && (
-          <div className="sbx-preview">
+          <div className="sbx-preview" hidden={!previewOpen}>
             <div className="sbx-preview-stage">
+              <iframe
+                key={frameKey}
+                ref={frameRef}
+                className="sbx-frame"
+                style={{ width: `${previewW}px`, maxWidth: "100%", aspectRatio: `${previewW} / ${previewH}` }}
+                sandbox="allow-scripts"
+                title="live figure preview"
+                srcDoc={srcdoc}
+              />
               {hasPreviewControls && (
                 <div className="sbx-controls" role="toolbar" aria-label="Preview controls">
                   <button className="sbx-ctl sbx-icon" onClick={togglePlay} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
@@ -489,15 +504,6 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
                   </button>
                 </div>
               )}
-              <iframe
-                key={frameKey}
-                ref={frameRef}
-                className="sbx-frame"
-                style={{ width: `${previewW}px`, maxWidth: "100%", aspectRatio: `${previewW} / ${previewH}` }}
-                sandbox="allow-scripts"
-                title="live figure preview"
-                srcDoc={srcdoc}
-              />
             </div>
             <PreviewConsole logs={logs} onClear={() => setLogs([])} />
           </div>
