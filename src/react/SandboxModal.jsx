@@ -161,7 +161,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
 
             ".cm-scroller": { fontFamily: "'Roboto Mono', ui-monospace, 'SF Mono', monospace", fontSize: "0.85rem", lineHeight: "1.7", paddingBottom: "40vh" },
             "&.cm-focused": { outline: "none" },
-            ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": { background: "color-mix(in srgb, var(--astro-code-foreground, var(--sbx-ink)) 22%, transparent)" },
+            ".cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": { background: "color-mix(in srgb, var(--astro-code-foreground, var(--sbx-ink)) 22%, transparent)" },
 
             ".cm-gutters": { background: "transparent", border: "none", color: "color-mix(in srgb, var(--astro-code-foreground, var(--sbx-ink)) 40%, transparent)" },
             ".cm-lineNumbers .cm-gutterElement": { padding: "0 6px 0 8px", minWidth: "2ch" },
@@ -353,6 +353,11 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const escapeRef = useRef(null);
   escapeRef.current = () => {
     if (settingsOpen) { setSettingsOpen(false); return true; }
+    const view = cmRef.current;
+    if (view && view.state.selection.ranges.length > 1) {
+      view.dispatch({ selection: view.state.selection.asSingle() });
+      return true;
+    }
     if (dirty) return false;
     requestClose();
     return true;

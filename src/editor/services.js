@@ -4,6 +4,7 @@ import { indentUnit, indentOnInput } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { editorFind } from "./find.js";
 import { editorErrors } from "./errors.js";
+import { multiCursor, multiCursorKeymap } from "./multicursor.js";
 
 const tabIndent = ({ state, dispatch }) => {
   if (state.selection.ranges.some((r) => !r.empty)) return indentMore({ state, dispatch });
@@ -11,7 +12,7 @@ const tabIndent = ({ state, dispatch }) => {
   return true;
 };
 
-export const codeKeybindings = [...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, { key: "Mod-y", run: redo, preventDefault: true }, { key: "Tab", run: tabIndent, shift: indentLess }];
+export const codeKeybindings = [...closeBracketsKeymap, ...multiCursorKeymap, ...defaultKeymap, ...historyKeymap, { key: "Mod-y", run: redo, preventDefault: true }, { key: "Tab", run: tabIndent, shift: indentLess }];
 
 export function codeServices(extraKeys = []) {
   return [
@@ -21,6 +22,7 @@ export function codeServices(extraKeys = []) {
     indentUnit.of("  "),
     indentOnInput(),
     closeBrackets(),
+    multiCursor,
     editorFind,
     editorErrors,
     keymap.of([...codeKeybindings, ...extraKeys]),
