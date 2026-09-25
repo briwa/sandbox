@@ -1,5 +1,5 @@
 import { Decoration, EditorView, WidgetType, ViewPlugin, keymap } from '@codemirror/view';
-import { EditorState, StateField, Prec, Transaction } from '@codemirror/state';
+import { EditorState, StateField, Prec, Transaction, MapMode } from '@codemirror/state';
 import { autocompletion, completionStatus } from '@codemirror/autocomplete';
 import { describeSandboxBlock, findSandboxBlocks } from '../core/index.js';
 import { iconSvg, KIND_ICONS } from '../core/icons.js';
@@ -151,13 +151,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
 
   const edgeAt = (state, pos) => {
     const block = blockAt(state, pos);
-    if (!block || (pos !== block.from && pos !== block.to)) return null;
-    return { ...block, side: pos === block.from ? 'before' : 'after' };
-  };
-
-  const mainEdge = (state) => {
-    const sel = state.selection.main;
-    return sel.empty ? edgeAt(state, sel.head) : null;
+    return block && (pos === block.from || pos === block.to) ? block : null;
   };
 
   const selectedBlock = (state) => {
@@ -170,6 +164,12 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
   const selectBlock = (view, block) => {
     view.dispatch({ selection: { anchor: block.from, head: block.to }, scrollIntoView: true });
     return true;
+  };
+
+  const withSelected = (fn) => (view) => {
+    if (view.state.selection.ranges.length > 1) return false;
+    const block = selectedBlock(view.state);
+    return block ? fn(view, block) : false;
   };
 
   const openLine = (view, pos, before) => {
@@ -191,116 +191,41 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
     return true;
   };
 
-  const leave = (view, block, dir) => {
+  const leave = (dir) => withSelected((view, block) => {
     const doc = view.state.doc;
-    if (dir < 0) {
-      const anchor = block.from > 0 ? doc.lineAt(block.from - 1).to : block.from;
-      view.dispatch({ selection: { anchor }, scrollIntoView: true });
-    } else {
-      const anchor = block.to < doc.length ? doc.lineAt(block.to + 1).from : block.to;
-      view.dispatch({ selection: { anchor }, scrollIntoView: true });
-    }
+    const anchor = dir < 0
+      ? (block.from > 0 ? doc.lineAt(block.from - 1).to : block.from)
+      : (block.to < doc.length ? doc.lineAt(block.to + 1).from : block.to);
+    view.dispatch({ selection: { anchor }, scrollIntoView: true });
     return true;
-  };
+  });
 
-  const stepOut = (view, edge, dir) => {
-    const doc = view.state.doc;
-    const line = dir < 0 ? (edge.from > 0 ? doc.lineAt(edge.from - 1) : null) : (edge.to < doc.length ? doc.lineAt(edge.to + 1) : null);
-    if (!line) return true;
-    if (line.length === 0) {
-      const changes = dir < 0 ? { from: line.from, to: edge.from } : { from: edge.to, to: line.to };
-      view.dispatch({ changes, selection: { anchor: dir < 0 ? line.from : edge.to }, userEvent: dir < 0 ? 'delete.backward' : 'delete.forward' });
-    } else {
-      view.dispatch({ selection: { anchor: dir < 0 ? line.to : line.from }, scrollIntoView: true });
-    }
-    return true;
-  };
-
-  const vertical = (dir) => (view) => {
+  const crossVertically = (dir) => (view) => {
     const { state } = view;
-    if (state.selection.ranges.length > 1) return false;
-    const selected = selectedBlock(state);
-    if (selected) return leave(view, selected, dir);
     const range = state.selection.main;
-    if (!range.empty) return false;
-    const edge = mainEdge(state);
-    if (edge) {
-      if ((edge.side === 'before') === (dir > 0)) return selectBlock(view, edge);
-      return false;
-    }
+    if (state.selection.ranges.length > 1 || !range.empty) return false;
     const next = view.moveVertically(range, dir > 0).head;
     const crossed = blockBetween(state, range.head, next, dir);
     return crossed ? selectBlock(view, crossed) : false;
   };
 
-  const horizontal = (dir) => (view) => {
-    const { state } = view;
-    if (state.selection.ranges.length > 1) return false;
-    const selected = selectedBlock(state);
-    if (selected) return leave(view, selected, dir);
-    const range = state.selection.main;
-    if (!range.empty) return false;
-    const edge = mainEdge(state);
-    if (edge) {
-      if ((edge.side === 'before') === (dir > 0)) return selectBlock(view, edge);
-      return leave(view, edge, dir);
-    }
-    const line = state.doc.lineAt(range.head);
-    if (range.head !== (dir > 0 ? line.to : line.from)) return false;
-    const block = edgeAt(state, range.head + dir);
-    return block ? selectBlock(view, block) : false;
-  };
-
-  const erase = (dir) => (view) => {
-    const selected = selectedBlock(view.state);
-    if (selected) return deleteBlock(view, selected);
-    const edge = mainEdge(view.state);
-    if (!edge) return false;
-    if ((edge.side === 'after') === (dir < 0)) return selectBlock(view, edge);
-    return stepOut(view, edge, dir);
-  };
-
-  const enter = (view) => {
-    const selected = selectedBlock(view.state);
-    if (selected) return openLine(view, selected.to, false);
-    const edge = mainEdge(view.state);
-    if (!edge) return false;
-    return edge.side === 'before' ? openLine(view, edge.from, true) : openLine(view, edge.to, false);
-  };
-
-  const edgeKeymap = Prec.high(keymap.of([
-    { key: 'Enter', run: enter },
-    { key: 'Shift-Enter', run: (view) => {
-      const selected = selectedBlock(view.state);
-      return selected ? openLine(view, selected.from, true) : false;
-    } },
-    { key: 'Backspace', run: erase(-1) },
-    { key: 'Delete', run: erase(1) },
-    { key: 'ArrowLeft', run: horizontal(-1) },
-    { key: 'ArrowRight', run: horizontal(1) },
-    { key: 'ArrowUp', run: vertical(-1) },
-    { key: 'ArrowDown', run: vertical(1) },
-    { key: 'Escape', run: (view) => {
-      const selected = selectedBlock(view.state);
-      return selected ? leave(view, selected, 1) : false;
-    } },
+  const blockKeymap = Prec.high(keymap.of([
+    { key: 'Enter', run: withSelected((view, block) => openLine(view, block.to, false)) },
+    { key: 'Shift-Enter', run: withSelected((view, block) => openLine(view, block.from, true)) },
+    { key: 'Backspace', run: withSelected(deleteBlock) },
+    { key: 'Delete', run: withSelected(deleteBlock) },
+    { key: 'ArrowLeft', run: leave(-1) },
+    { key: 'ArrowRight', run: leave(1) },
+    { key: 'ArrowUp', run: (view) => leave(-1)(view) || crossVertically(-1)(view) },
+    { key: 'ArrowDown', run: (view) => leave(1)(view) || crossVertically(1)(view) },
+    { key: 'Escape', run: leave(1) },
   ]));
 
-  const edgeInput = EditorView.inputHandler.of((view, from, to, text) => {
-    const selected = selectedBlock(view.state);
-    const edge = from === to ? edgeAt(view.state, from) : null;
-    if (selected && from === selected.from && to === selected.to) {
-      const insert = '\n' + text;
-      view.dispatch({ changes: { from: to, insert }, selection: { anchor: to + insert.length }, userEvent: 'input.type' });
-      return true;
-    }
-    if (!edge) return false;
-    const insert = edge.side === 'before' ? text + '\n' : '\n' + text;
-    view.dispatch({
-      changes: { from, insert },
-      selection: { anchor: edge.side === 'before' ? from + text.length : from + insert.length },
-      userEvent: 'input.type',
-    });
+  const typeBelow = EditorView.inputHandler.of((view, from, to, text) => {
+    const block = selectedBlock(view.state);
+    if (!block || from !== block.from || to !== block.to) return false;
+    const insert = '\n' + text;
+    view.dispatch({ changes: { from: to, insert }, selection: { anchor: to + insert.length }, userEvent: 'input.type' });
     return true;
   });
 
@@ -322,9 +247,10 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
     const edits = [];
     tr.changes.iterChanges((fromA, toA, fromB, toB, text) => edits.push({ at: fromA, to: toA, text: text.toString() }));
     if (edits.length !== 1) return tr;
-    const { at, to, text } = edits[0];
-    const doc = startState.doc;
+    let { at, to, text } = edits[0];
     const paste = tr.isUserEvent('input.paste');
+    const selected = paste ? selectedBlock(startState) : null;
+    if (selected && at === selected.from && to === selected.to) at = to;
     const spec = (insert, anchor) => ({
       changes: { from: at, to, insert },
       selection: { anchor },
@@ -332,54 +258,63 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       scrollIntoView: true,
       userEvent: tr.annotation(Transaction.userEvent),
     });
-
+    const doc = startState.doc;
     if (/```\s*$/.test(text) && (paste || at === to)) {
       const body = text.replace(/\s+$/, '');
-      const lead = /^```/.test(body) && at > doc.lineAt(at).from ? '\n' : '';
+      const lead = at > doc.lineAt(at).from ? '\n' : '';
       const gap = to < doc.length && doc.sliceString(to, to + 1) !== '\n' ? '\n' : '';
       return spec(lead + body + '\n' + gap, at + lead.length + body.length + 1);
     }
-
-    const edge = paste && at === to ? mainEdge(startState) : null;
-    if (!edge || !text) return tr;
-    if (edge.side === 'before') return spec(text.endsWith('\n') ? text : text + '\n', at + text.replace(/\n$/, '').length);
-    const insert = text.startsWith('\n') ? text : '\n' + text;
-    return spec(insert, at + insert.length);
+    if (at !== edits[0].at) return spec('\n' + text, at + text.length + 1);
+    return tr;
   });
 
-  const selectAtBoundary = EditorState.transactionFilter.of((tr) => {
-    if (!tr.selection) return tr;
+  const fenceGuard = EditorState.transactionFilter.of((tr) => {
+    if (!tr.docChanged || tr.isUserEvent('undo') || tr.isUserEvent('redo')) return tr;
+    const doc = tr.newDoc;
+    const broken = [];
+    tr.startState.field(decorationField).between(0, tr.startState.doc.length, (from, to, deco) => {
+      const nf = tr.changes.mapPos(from, 1, MapMode.TrackDel);
+      const nt = tr.changes.mapPos(to, -1, MapMode.TrackDel);
+      if (nf == null || nt == null) return;
+      const block = { from, to, index: deco.spec.widget.index };
+      if (nf > 0 && doc.sliceString(nf - 1, nf) !== '\n') broken.push({ pos: nf, block });
+      if (nt < doc.length && doc.sliceString(nt, nt + 1) !== '\n') broken.push({ pos: nt, block });
+    });
+    if (!broken.length) return tr;
+    if (tr.isUserEvent('delete') && tr.startState.selection.main.empty) {
+      const { block } = broken[0];
+      return { selection: { anchor: block.from, head: block.to }, scrollIntoView: true };
+    }
+    return [tr, { changes: broken.map(({ pos }) => ({ from: pos, insert: '\n' })), sequential: true }];
+  });
+
+  const selectAtEdge = EditorState.transactionFilter.of((tr) => {
+    if (!tr.selection && !tr.docChanged) return tr;
     const { state } = tr;
     const sel = state.selection;
     if (sel.ranges.length > 1 || !sel.main.empty) return tr;
-    const edge = edgeAt(state, sel.main.head);
-    if (!edge || (edge.side === 'before' ? edge.from > 0 : edge.to < state.doc.length)) return tr;
-    return [tr, { selection: { anchor: edge.from, head: edge.to }, sequential: true }];
+    const block = edgeAt(state, sel.main.head);
+    if (!block) return tr;
+    return [tr, { selection: { anchor: block.from, head: block.to }, sequential: true }];
   });
 
-  const CARET_CLASSES = ['cm-sbx-caret-before', 'cm-sbx-caret-after', 'cm-sbx-selected'];
-  const edgeCaret = ViewPlugin.fromClass(
+  const selectedMark = ViewPlugin.fromClass(
     class {
       constructor(view) { this.marked = null; this.sync(view); }
       update(u) { if (u.selectionSet || u.docChanged || u.focusChanged || u.viewportChanged) this.sync(u.view); }
       sync(view) {
         view.requestMeasure({
-          read: () => {
-            if (!view.hasFocus || view.state.selection.ranges.length > 1) return null;
-            const selected = selectedBlock(view.state);
-            if (selected) return { index: selected.index, cls: 'cm-sbx-selected' };
-            const edge = mainEdge(view.state);
-            return edge ? { index: edge.index, cls: `cm-sbx-caret-${edge.side}` } : null;
-          },
-          write: (mark) => {
-            this.marked?.classList.remove(...CARET_CLASSES);
-            this.marked = mark ? view.contentDOM.querySelector(`[data-sbx-index="${mark.index}"]`) : null;
-            if (this.marked) this.marked.classList.add(mark.cls);
-            view.dom.classList.toggle('cm-sbx-at-edge', !!this.marked);
+          read: () => (view.hasFocus && view.state.selection.ranges.length === 1 ? selectedBlock(view.state) : null),
+          write: (block) => {
+            this.marked?.classList.remove('cm-sbx-selected');
+            this.marked = block ? view.contentDOM.querySelector(`[data-sbx-index="${block.index}"]`) : null;
+            this.marked?.classList.add('cm-sbx-selected');
+            view.dom.classList.toggle('cm-sbx-has-selected', !!this.marked);
           },
         });
       }
-      destroy() { this.marked?.classList.remove(...CARET_CLASSES); }
+      destroy() { this.marked?.classList.remove('cm-sbx-selected'); }
     }
   );
 
@@ -429,12 +364,13 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
   return [
     decorationField,
     EditorView.atomicRanges.of((view) => view.state.field(decorationField)),
-    edgeKeymap,
-    edgeInput,
+    blockKeymap,
+    typeBelow,
     selectOnClick,
     fenceBreaks,
-    selectAtBoundary,
-    edgeCaret,
+    fenceGuard,
+    selectAtEdge,
+    selectedMark,
     slashComplete,
     slashCommand,
   ];
