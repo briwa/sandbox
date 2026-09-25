@@ -5,6 +5,7 @@ import { syntaxHighlighting, codeFolding, foldGutter, foldKeymap, bracketMatchin
 import { javascript } from "@codemirror/lang-javascript";
 import { vue } from "@codemirror/lang-vue";
 import Icon from "./Icon.jsx";
+import { KIND_ICONS } from "../core/icons.js";
 import EditorFind from "./EditorFind.jsx";
 import PreviewConsole, { appendConsole } from "./PreviewConsole.jsx";
 import { codeServices } from "../editor/services.js";
@@ -110,6 +111,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   // mounted by its own runtime, so `control` has nothing to act on.
   const hasControls = isFigure && !isVue && (viz === "canvas" || viz === "root");
   const showPreview = isFigure && previewOpen;
+  const tags = isFigure ? [[lang, lang], [viz, viz]] : KIND_ICONS[isVue ? "vue" : "source"];
 
   function updatePreview() {
     if (!isFigure) return;
@@ -372,18 +374,21 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
       aria-label={isFigure ? "Edit sandbox figure" : "Edit shared source"}
     >
       <div className="sbx-float" role="toolbar" aria-label="Editor actions">
+        {dirty && (
+          <button className="sbx-float-btn save" onClick={save} title="Save (⌘S)" aria-label="Save">
+            <Icon name="save" size={15} />
+          </button>
+        )}
         <div className="sbx-settings" ref={settingsRef}>
           <button
-            className={`sbx-float-btn sbx-kind ${settingsOpen ? "is-on" : ""}`}
+            className={`sbx-float-btn ${settingsOpen ? "is-on" : ""}`}
             onClick={() => setSettingsOpen((o) => !o)}
-            title={`Settings — ${lang}${isFigure ? ` · ${viz}` : ""}`}
+            title="Settings"
             aria-label="Settings"
             aria-haspopup="dialog"
             aria-expanded={settingsOpen}
           >
-            <Icon name={lang} size={15} />
-            {isFigure && <Icon name={viz} size={15} />}
-            <Icon name="chevronDown" size={12} />
+            <Icon name="settings" size={15} />
           </button>
           {settingsOpen && (
             <div className="sbx-settings-panel" role="dialog" aria-label="Settings">
@@ -445,11 +450,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
             </div>
           )}
         </div>
-        {dirty && (
-          <button className="sbx-float-btn save" onClick={save} title="Save (⌘S)" aria-label="Save">
-            <Icon name="save" size={15} />
-          </button>
-        )}
+        <span className="sbx-float-sep" aria-hidden="true" />
         {isFigure && (
           <button
             className={`sbx-float-btn ${previewOpen ? "is-on" : ""}`}
@@ -472,6 +473,13 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
       >
         <div className="sbx-code-pane">
           <div className="sbx-code" ref={hostRef} />
+          <div className="sbx-tags" aria-label="Editing">
+            {tags.map(([icon, title]) => (
+              <span key={icon} className="cm-sbx-chip icon" title={title} aria-label={title}>
+                <Icon name={icon} size={13} />
+              </span>
+            ))}
+          </div>
           {/* The scope is the whole fence editor, not just the code host:
               ⌘F from its toolbar means the code in front of you, and the page
               editor behind it has a find bar of its own that would otherwise
