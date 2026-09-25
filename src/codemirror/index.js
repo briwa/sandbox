@@ -270,6 +270,10 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
 
   const edgeKeymap = Prec.high(keymap.of([
     { key: 'Enter', run: enter },
+    { key: 'Shift-Enter', run: (view) => {
+      const selected = selectedBlock(view.state);
+      return selected ? openLine(view, selected.from, true) : false;
+    } },
     { key: 'Backspace', run: erase(-1) },
     { key: 'Delete', run: erase(1) },
     { key: 'ArrowLeft', run: horizontal(-1) },
@@ -341,6 +345,16 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
     if (edge.side === 'before') return spec(text.endsWith('\n') ? text : text + '\n', at + text.replace(/\n$/, '').length);
     const insert = text.startsWith('\n') ? text : '\n' + text;
     return spec(insert, at + insert.length);
+  });
+
+  const selectAtBoundary = EditorState.transactionFilter.of((tr) => {
+    if (!tr.selection) return tr;
+    const { state } = tr;
+    const sel = state.selection;
+    if (sel.ranges.length > 1 || !sel.main.empty) return tr;
+    const edge = edgeAt(state, sel.main.head);
+    if (!edge || (edge.side === 'before' ? edge.from > 0 : edge.to < state.doc.length)) return tr;
+    return [tr, { selection: { anchor: edge.from, head: edge.to }, sequential: true }];
   });
 
   const CARET_CLASSES = ['cm-sbx-caret-before', 'cm-sbx-caret-after', 'cm-sbx-selected'];
@@ -419,6 +433,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
     edgeInput,
     selectOnClick,
     fenceBreaks,
+    selectAtBoundary,
     edgeCaret,
     slashComplete,
     slashCommand,
