@@ -37,6 +37,29 @@
   border-radius: 6px;
   background: color-mix(in srgb, var(--sbx-ink) 3%, transparent);
 }
+.cm-sbx-card { position: relative; }
+.cm-sbx-at-edge .cm-cursorLayer,
+.cm-sbx-at-edge .cm-selectionLayer { visibility: hidden; }
+.cm-sbx-selected {
+  outline: 2px solid var(--sbx-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.cm-sbx-caret-before::before,
+.cm-sbx-caret-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  pointer-events: none;
+  animation: cm-sbx-caret-blink 1.2s steps(1) infinite;
+}
+.cm-sbx-caret-before::before { top: -4px; }
+.cm-sbx-caret-after::after { bottom: -4px; }
+@keyframes cm-sbx-caret-blink { 50% { opacity: 0; } }
 .cm-sbx-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
 .cm-sbx-label {
   font-size: 0.78rem;

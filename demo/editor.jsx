@@ -129,9 +129,15 @@ function Editor() {
     const { from, to } = editing;
 
     const insert = from > 0 && view.state.doc.sliceString(from - 1, from) !== '\n' ? '\n' + fence : fence;
-    view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + insert.length } });
+    const below = view.state.doc.sliceString(to, to + 1) === '\n' ? 1 : 0;
+    view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + insert.length + below } });
     if (keepOpen) setEditing((s) => (s ? { ...s, to: from + insert.length } : s));
     else { setEditing(null); view.focus(); }
+  }
+
+  function cancel() {
+    setEditing(null);
+    viewRef.current?.focus();
   }
 
   const isEditing = (block) =>
@@ -150,7 +156,7 @@ function Editor() {
             siblings={editing.siblings}
             draftKey="demo-sandbox"
             onSave={save}
-            onCancel={() => setEditing(null)}
+            onCancel={cancel}
           />
         )}
         {editing?.modal === 'external' && (
@@ -159,7 +165,7 @@ function Editor() {
             targetKey={editing.from}
             initial={editing.initial}
             onSave={save}
-            onCancel={() => setEditing(null)}
+            onCancel={cancel}
           />
         )}
       </div>
