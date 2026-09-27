@@ -31,7 +31,7 @@ svg.innerHTML = Array.from({ length: 24 }, (_, i) => {
 
 ## Shared source
 
-\`\`\`sandbox=js label="polar helpers"
+\`\`\`sandbox=js open label="polar helpers"
 const polar = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
 \`\`\`
 

@@ -61,6 +61,7 @@ export function specToToolbar(spec = {}) {
     h: spec.h || DEFAULT_H,
     bg: spec.bg || '',
     showCode: Boolean(spec.showCode),
+    open: Boolean(spec.open),
     control: spec.control || 'pausable',
     idle: spec.idle || 0,
     meta: spec.meta || '',
@@ -139,7 +140,7 @@ export function describeSandboxBlock(spec = {}) {
 
 const metaValue = (v) => (/[\s"]/.test(v) ? `"${escapeAttr(v)}"` : v);
 
-export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode, control, idle, meta, label, componentName }) {
+export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode, open, control, idle, meta, label, componentName }) {
   if (kind === 'external') return { lang: 'sandbox=external', meta: label ? `label=${metaValue(label)}` : '' };
 
   const isVue = type === 'vue';
@@ -147,13 +148,15 @@ export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode
 
   if (kind === 'source') {
     const name = isVue ? componentName || label : label;
-    return { lang, meta: name ? `label=${metaValue(name)}` : '' };
+    const tokens = [open && 'open', name && `label=${metaValue(name)}`].filter(Boolean);
+    return { lang, meta: tokens.join(' ') };
   }
 
   const tokens = [isVue || !type || type === 'canvas' ? 'viz' : `viz=${type}`];
   if (w && h && !(Number(w) === DEFAULT_W && Number(h) === DEFAULT_H)) tokens.push(`${w}x${h}`);
   if (bg) tokens.push(`bg=${metaValue(bg)}`);
-  if (showCode) tokens.push('code');
+  if (open) tokens.push('open');
+  else if (showCode) tokens.push('code');
   if (control && control !== 'pausable' && !isVue) tokens.push(`control=${control}`);
   if (idle && !isVue) tokens.push(`idle=${Math.max(0, Number(idle) || 0)}`);
   if (meta) tokens.push(`meta=${metaValue(meta)}`);
@@ -197,6 +200,7 @@ function tokenizeMeta(meta) {
 // ```sandbox=js              shared source, pooled into every figure in the document
 // ```sandbox=js viz           a figure — `viz=svg` / `viz=root` pick the surface
 // ```sandbox=js viz idle=2000  a figure that sits at 2s in until it is played
+// ```sandbox=js viz open      a figure that starts on its code — `open` also unfolds a shared source
 // ```sandbox=vue label=Name   a component every vue figure can render
 // ```sandbox=external         https .js URLs, one per line — `label=Name` overrides the derived name
 // Anything else — plain ```js, ```vue — is an ordinary code block we never touch.
@@ -210,27 +214,29 @@ export function parseMeta(lang, meta) {
   if (dialect === 'external') return { kind: 'external', lang: 'external', label };
   const isVue = dialect === 'vue';
 
+  const open = flags.has('open');
+
   if (!has('viz')) {
-    if (!isVue) return { kind: 'source', lang: 'js', label };
+    if (!isVue) return { kind: 'source', lang: 'js', label, open };
     // A Vue SFC carries no name of its own, so `label` doubles as the tag to register under.
     const componentName = /^[A-Z][\w-]*$/.test(label) ? label : '';
-    return { kind: 'source', lang: 'vue', componentName, label };
+    return { kind: 'source', lang: 'vue', componentName, label, open };
   }
 
   const size = [...flags].find((t) => /^\d+x\d+$/.test(t));
   const [w, h] = size ? size.split('x').map(Number) : [DEFAULT_W, DEFAULT_H];
   const bg = /^[#\w(),.%\s-]+$/.test(values.bg || '') ? values.bg : '';
-  const showCode = flags.has('code');
+  const showCode = open || flags.has('code');
   const metaText = values.meta || '';
 
-  if (isVue) return { kind: 'figure', lang: 'vue', preset: 'root', w, h, showCode, bg, label, meta: metaText };
+  if (isVue) return { kind: 'figure', lang: 'vue', preset: 'root', w, h, showCode, open, bg, label, meta: metaText };
 
   const preset = PRESETS.has(values.viz) ? values.viz : 'canvas';
   let control = values.control || (flags.has('auto') ? 'auto' : 'pausable');
   if (!CONTROL_MODES.includes(control)) control = 'pausable';
   const idle = Math.max(0, Number(values.idle) || 0);
 
-  return { kind: 'figure', lang: 'js', preset, w, h, showCode, bg, control, idle, label, meta: metaText };
+  return { kind: 'figure', lang: 'js', preset, w, h, showCode, open, bg, control, idle, label, meta: metaText };
 }
 
 export function sandboxPrelude(blocks) {

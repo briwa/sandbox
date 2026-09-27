@@ -69,6 +69,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [h, setH] = useState(seed.h || 360);
   const [bg, setBg] = useState(seed.bg || "");
   const [showCode, setShowCode] = useState(Boolean(seed.showCode));
+  const [open, setOpen] = useState(Boolean(seed.open));
   const [control, setControl] = useState(seed.control || "pausable");
   const [idle, setIdle] = useState(seed.idle || 0);
   const [meta, setMeta] = useState(seed.meta || "");
@@ -130,7 +131,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const persist = () => {
     if (!draftKey || clearedRef.current) return;
     const code = cmRef.current ? cmRef.current.state.doc.toString() : (seed.code || "");
-    saveSandboxDraft(draftKey, { lang, viz, w, h, bg, showCode, control, idle, meta, label, code });
+    saveSandboxDraft(draftKey, { lang, viz, w, h, bg, showCode, open, control, idle, meta, label, code });
   };
   persistRef.current = persist;
   const scheduleSave = () => {
@@ -214,8 +215,8 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   // fell straight through the guard — so every modal opened already dirty and
   // wrote a recovery draft for an edit nobody had made. Comparing snapshots
   // instead is indifferent to how many times the effect runs.
-  const metaSnapshot = JSON.stringify([lang, viz, w, h, bg, idle, label]);
-  const draftSnapshot = JSON.stringify([lang, viz, w, h, bg, showCode, control, idle, meta, label]);
+  const metaSnapshot = JSON.stringify([lang, viz, w, h, bg, open, idle, label]);
+  const draftSnapshot = JSON.stringify([lang, viz, w, h, bg, showCode, open, control, idle, meta, label]);
   const metaSeenRef = useRef(metaSnapshot);
   const draftSeenRef = useRef(draftSnapshot);
 
@@ -336,12 +337,12 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   function save() {
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     if (isFigure) {
-      const state = { kind: "figure", type: isVue ? "vue" : viz, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, control, idle: Number(idle) || 0, meta, label };
+      const state = { kind: "figure", type: isVue ? "vue" : viz, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, open, control, idle: Number(idle) || 0, meta, label };
       onSave(buildSandboxFence(state, body), { keepOpen: true });
       updatePreview();
     } else {
       finishDraft();
-      onSave(buildSandboxFence({ kind: "source", type: lang, label }, body));
+      onSave(buildSandboxFence({ kind: "source", type: lang, label, open }, body));
     }
   }
   saveRef.current = save;
@@ -443,9 +444,15 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
                     <input type="text" value={meta} onChange={(e) => setMeta(e.target.value)} />
                   </label>
                   <div className="sbx-toggles">
-                    <label className="sbx-check"><input type="checkbox" checked={showCode} onChange={(e) => setShowCode(e.target.checked)} /> show code</label>
+                    <label className="sbx-check"><input type="checkbox" checked={showCode || open} disabled={open} onChange={(e) => setShowCode(e.target.checked)} /> show code</label>
+                    <label className="sbx-check"><input type="checkbox" checked={open} onChange={(e) => setOpen(e.target.checked)} /> start on code</label>
                   </div>
                 </>
+              )}
+              {!isFigure && (
+                <div className="sbx-toggles">
+                  <label className="sbx-check"><input type="checkbox" checked={open} onChange={(e) => setOpen(e.target.checked)} /> start open</label>
+                </div>
               )}
             </div>
           )}

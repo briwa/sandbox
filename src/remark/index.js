@@ -75,7 +75,7 @@ export function remarkSandbox({ highlight } = {}) {
           parent.children[index] = {
             type: 'html',
             value:
-              `<details class="sandbox sandbox-lib${kind === 'external' ? ' sandbox-external' : ''}">` +
+              `<details class="sandbox sandbox-lib${kind === 'external' ? ' sandbox-external' : ''}"${spec.open ? ' open' : ''}>` +
               libSummary(kind, label) +
               body +
               `</details>`,
@@ -91,7 +91,7 @@ export function remarkSandbox({ highlight } = {}) {
         const codeHtml = spec.showCode ? await highlightCode(code, spec.lang) : '';
         const html =
 
-          `<figure class="sandbox" data-mode="preview" data-preset="${spec.preset}"` +
+          `<figure class="sandbox" data-mode="${spec.open ? 'code' : 'preview'}" data-preset="${spec.preset}"` +
           (spec.control ? ` data-control="${spec.control}"` : '') +
           ` style="--sandbox-h:${spec.h}px;--sandbox-ar:${spec.w}/${spec.h}">` +
 
@@ -104,7 +104,9 @@ export function remarkSandbox({ highlight } = {}) {
             ? `<div class="sandbox-code">${codeHtml}</div>` +
               `<div class="sandbox-tools">` +
               copyButton +
-              `<button class="sandbox-toggle" type="button" title="Show code" aria-label="Show code">${iconSvg('code')}</button>` +
+              (spec.open
+                ? `<button class="sandbox-toggle" type="button" title="Show preview" aria-label="Show preview">${iconSvg('eye')}</button>`
+                : `<button class="sandbox-toggle" type="button" title="Show code" aria-label="Show code">${iconSvg('code')}</button>`) +
               `</div>`
             : '') +
           `</figure>`;
