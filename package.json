@@ -14,6 +14,7 @@
     ".": "./dist/core/index.js",
     "./client": "./dist/client/index.js",
     "./remark": "./dist/remark/index.js",
+    "./markdown": "./dist/markdown/index.js",
     "./codemirror": "./dist/codemirror/index.js",
     "./editor": "./dist/editor/index.js",
     "./react": "./dist/react/index.js",
@@ -44,6 +45,7 @@
   },
   "devDependencies": {
     "@astrojs/internal-helpers": "^0.11.0",
+    "@astrojs/markdown-remark": "^7.3.1",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.11.0",
     "@codemirror/lang-javascript": "^6.2.5",
@@ -65,6 +67,7 @@
   },
   "peerDependencies": {
     "@astrojs/internal-helpers": "^0.11.0",
+    "@astrojs/markdown-remark": "^7",
     "@codemirror/autocomplete": "^6",
     "@codemirror/commands": "^6",
     "@codemirror/lang-javascript": "^6",
@@ -73,10 +76,29 @@
     "@codemirror/state": "^6",
     "@codemirror/view": "^6",
     "@lezer/highlight": "^1",
-    "react": "^18 || ^19"
+    "react": "^18 || ^19",
+    "rehype-stringify": "^10",
+    "remark-parse": "^11",
+    "remark-rehype": "^11",
+    "unified": "^11"
   },
   "peerDependenciesMeta": {
     "@astrojs/internal-helpers": {
+      "optional": true
+    },
+    "@astrojs/markdown-remark": {
+      "optional": true
+    },
+    "rehype-stringify": {
+      "optional": true
+    },
+    "remark-parse": {
+      "optional": true
+    },
+    "remark-rehype": {
+      "optional": true
+    },
+    "unified": {
       "optional": true
     }
   }

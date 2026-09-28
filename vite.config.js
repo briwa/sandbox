@@ -9,6 +9,7 @@ const publicEntries = [
   ['@briwa.dev/sandbox/codemirror', 'src/codemirror/index.js'],
   ['@briwa.dev/sandbox/client', 'src/client/index.js'],
   ['@briwa.dev/sandbox/remark', 'src/remark/index.js'],
+  ['@briwa.dev/sandbox/markdown', 'src/markdown/index.js'],
   ['@briwa.dev/sandbox/editor', 'src/editor/index.js'],
   ['@briwa.dev/sandbox/react', 'src/react/index.js'],
   ['@briwa.dev/sandbox/astro', 'src/astro/index.js'],

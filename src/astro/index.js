@@ -1,4 +1,4 @@
-import { remarkSandbox, remarkStripHtml } from '../remark/index.js';
+import { remarkSandbox, remarkStripHtml, sandboxMarkdownPlugins } from '../remark/index.js';
 
 export function shikiHighlight({ theme = 'css-variables', ...rest } = {}) {
   let highlighter;
@@ -12,6 +12,24 @@ export function shikiHighlight({ theme = 'css-variables', ...rest } = {}) {
   };
 }
 
+// Astro 7 renders markdown with Sätteri by default, which runs no remark or rehype
+// plugins at all, and `markdown.remarkPlugins` is deprecated on its way out. The plugins
+// have to land on a `unified()` processor from `@astrojs/markdown-remark`: the site's
+// own, if it set one — its options object keeps its identity through config validation,
+// so pushing onto it is the supported way in — or one made here otherwise. The site's
+// remark plugins then see the figures already built, and the sandbox passes come first
+// so `remarkStripHtml` only ever removes what the author wrote.
+async function installPlugins(config, updateConfig, plugins) {
+  const { unified, isUnifiedProcessor } = await import('@astrojs/markdown-remark');
+  const current = config.markdown?.processor;
+  if (current && isUnifiedProcessor(current)) {
+    current.options.remarkPlugins.unshift(...plugins.remarkPlugins);
+    current.options.rehypePlugins.push(...plugins.rehypePlugins);
+    return;
+  }
+  updateConfig({ markdown: { processor: unified(plugins) } });
+}
+
 export default function sandbox(options = {}) {
   const {
     remark = true,
@@ -19,20 +37,21 @@ export default function sandbox(options = {}) {
     styles = true,
     editorStyles = false,
     shiki,
+    // Astro's own shiki already colours every ordinary fence, in every language it
+    // knows, so the fence pass is off unless a site asks for the figure highlighter's
+    // exact output there too.
+    fences = false,
+    links = true,
     clientOptions,
   } = options;
 
   return {
     name: '@briwa.dev/sandbox',
     hooks: {
-      'astro:config:setup': ({ updateConfig, injectScript }) => {
+      'astro:config:setup': async ({ config, updateConfig, injectScript }) => {
         if (remark) {
-          updateConfig({
-            markdown: {
-
-              remarkPlugins: [remarkStripHtml, [remarkSandbox, { highlight: shikiHighlight(shiki) }]],
-            },
-          });
+          const plugins = sandboxMarkdownPlugins({ highlight: shikiHighlight(shiki), fences, links });
+          await installPlugins(config, updateConfig, plugins);
         }
 
         const head = [];
@@ -51,4 +70,5 @@ export default function sandbox(options = {}) {
   };
 }
 
-export { remarkSandbox, remarkStripHtml };
+export { remarkSandbox, remarkStripHtml, sandboxMarkdownPlugins };
+export { remarkHighlightFences, rehypeLinks } from '../remark/index.js';

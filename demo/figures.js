@@ -3,6 +3,21 @@ import './demo.css';
 import { renderMarkdown } from './render.js';
 
 const source = `
+## prose
+
+A figure sits in ordinary markdown. A plain fence in a language the highlighter knows is
+coloured the same way as the code inside a figure, an [external link](https://github.com/briwa/sandbox)
+opens in a new tab, and a [link that would run script](javascript:alert(1)) is left as text.
+
+\`\`\`js
+const easeInOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+\`\`\`
+
+\`\`\`py
+def ease_in_out(p):
+    return 4 * p ** 3 if p < 0.5 else 1 - (-2 * p + 2) ** 3 / 2
+\`\`\`
+
 ## canvas (+ knobs)
 
 \`\`\`sandbox=js viz 480x260 control=auto code

@@ -4,6 +4,7 @@ const entryPoints = [
   'src/core/index.js',
   'src/client/index.js',
   'src/remark/index.js',
+  'src/markdown/index.js',
   'src/codemirror/index.js',
   'src/editor/index.js',
   'src/react/index.js',
