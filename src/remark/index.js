@@ -194,7 +194,8 @@ export function remarkHighlightFences({ highlight, languages = HIGHLIGHTED_LANGS
 // a link we would follow" better than a dead `#` does.
 //
 // `external` opens an http(s) link in a new tab, with `rel` set so the page it opens
-// cannot reach back. Everything else — a relative path, a mailto — stays in place.
+// cannot reach back, and marks it with an arrow leaving a frame so the reader knows
+// before clicking. Everything else — a relative path, a mailto — stays in place.
 //
 // Raw HTML was already dropped by remarkStripHtml, and a sandbox figure is still a `raw`
 // node here that this pass does not descend into: its own links were built by the figure
@@ -230,6 +231,9 @@ export function rehypeLinks({ safe = true, external = true } = {}) {
             else if (external && isExternalUrl(props.href)) {
               props.target = '_blank';
               props.rel = ['noopener', 'noreferrer'];
+              props.className = [...(props.className ?? []), 'sandbox-external'];
+              // Raw, like a figure: every host already lets raw HTML through for those.
+              child.children.push({ type: 'raw', value: iconSvg('external') });
             }
           }
           if (child.tagName === 'img' && typeof props.src === 'string' && safe && !isSafeUrl(props.src, { image: true })) {

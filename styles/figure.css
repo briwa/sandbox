@@ -219,3 +219,14 @@
 .sbx-tok-function { color: var(--sbx-code-function); }
 .sbx-tok-punctuation { color: var(--sbx-code-punctuation); }
 .sbx-tok-link { color: var(--sbx-code-link); text-decoration: underline; }
+
+/* A link the markdown pass sent to a new tab carries an arrow leaving a frame, sized to
+   the text it follows rather than to the icon's own pixels. */
+.sandbox-external > svg {
+  display: inline-block;
+  width: 0.72em;
+  height: 0.72em;
+  margin-left: 0.15em;
+  vertical-align: -0.02em;
+  stroke-width: 2.2;
+}
