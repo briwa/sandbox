@@ -31,22 +31,25 @@ svg.innerHTML = Array.from({ length: 24 }, (_, i) => {
 
 ## Shared source
 
-\`\`\`sandbox=js open label="polar helpers"
-const polar = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+\`\`\`sandbox=js open label="easing helpers"
+const easeInOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+const pingPong = (t, ms) => {
+  const p = (t % (ms * 2)) / ms;
+  return easeInOut(p > 1 ? 2 - p : p);
+};
 \`\`\`
 
 \`\`\`sandbox=js viz 480x220 control=auto code
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
-  ctx.beginPath();
-  for (let i = 0; i <= 200; i++) {
-    const a = (i / 200) * Math.PI * 2;
-    const [x, y] = polar(width / 2, height / 2, 60 + Math.sin(a * 5 + t / 600) * 30, a);
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  ctx.fillStyle = 'currentColor';
+  for (let i = 0; i < 8; i++) {
+    const y = 26 + i * 24;
+    const x = 30 + pingPong(t + i * 140, 1200) * (width - 60);
+    ctx.beginPath();
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fill();
   }
-  ctx.closePath();
-  ctx.strokeStyle = 'currentColor';
-  ctx.stroke();
 });
 \`\`\`
 

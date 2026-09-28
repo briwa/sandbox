@@ -16,7 +16,18 @@
 .sandbox[data-control='hover'] .sandbox-stage { position: relative; }
 .sandbox-hover { position: absolute; inset: 0; }
 
-.sandbox-code > pre { margin: 0; height: var(--sandbox-h); overflow-y: auto; }
+.sandbox-code > pre { margin: 0; height: var(--sandbox-h); overflow: auto; }
+/* The corner tools float over the code, so the code carries its own room on the right:
+   a long line scrolls clear of them instead of ending underneath. The padding sits on the
+   code box rather than the pre, since a scroll container's own end padding is not part of
+   the scrollable area in every browser, but a child's box always is. */
+.sandbox-code > pre > code {
+  display: block;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  padding-right: 4.6rem;
+}
 .sandbox[data-mode='preview'] .sandbox-code { display: none; }
 .sandbox[data-mode='code'] .sandbox-stage { display: none; }
 .sandbox-tools {
