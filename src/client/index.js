@@ -1,4 +1,4 @@
-import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KNOBS, MSG_GOTO } from '../core/protocol.js';
+import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KNOBS, MSG_HELLO, MSG_GOTO } from '../core/protocol.js';
 import { iconSvg } from '../core/icons.js';
 import { attachFigureKnobs, toggleFigureKnobs, closeFigureKnobs, knobMessage, knobResetMessage } from './knobs.js';
 
@@ -209,6 +209,9 @@ export function mountFigures({
     }
   };
   window.addEventListener('message', onMessage);
+  // A deferred host script can start after its frames already ran, and what they reported then
+  // went nowhere. Frames that have not run yet ignore this and report when they do.
+  for (const f of frames()) f.contentWindow?.postMessage({ [MSG_HELLO]: true }, '*');
 
   const primeFigures = () => { for (const f of frames()) pushFigureTheme(f.contentWindow); };
   if (prime) {

@@ -21,3 +21,6 @@ export const MSG_CONSOLE = '__sandboxConsole';
 // A figure reports the knobs its code declared once it has run; the host answers with values.
 export const MSG_KNOBS = '__sandboxKnobs';
 export const MSG_KNOB = '__sbxKnob';
+// The page saying it is listening. A frame that already ran reported to no one, so it sends
+// everything it has reported again: its height, its knobs, and the error it is showing.
+export const MSG_HELLO = '__sbxHello';

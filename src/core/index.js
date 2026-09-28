@@ -69,6 +69,11 @@ const knobRuntime = (values) =>
   `const __rerunSoon=()=>{if(__rrq)return;__rrq=true;requestAnimationFrame(()=>{__rrq=false;__rerun()})};` +
   `addEventListener('message',e=>{const k=e.data&&e.data.__sbxKnob;if(!k)return;if(k.reset)__knobVals={};else __knobVals[k.key]=k.value;__rerunSoon()});`;
 
+// Answers the page's hello with every report the frame has made so far. `report` and the error
+// each builder defines are looked up when the hello comes, so the order they are declared in is free.
+const HELLO =
+  `addEventListener('message',e=>{if(!e.data||!e.data.__sbxHello)return;report();if(!window.__sbxDead)__knobReport();if(window.__sbxErr)parent.postMessage({__sandboxError:window.__sbxErr},'*')});`;
+
 // Who drives playback. The last two hand that job to the host page: `manual` waits for
 // play/pause/reset messages, `hover` runs only while the host says the pointer is on it.
 export const CONTROL_MODES = ['pausable', 'auto', 'none', 'manual', 'hover'];
@@ -383,6 +388,7 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
   const script =
     VIS_GATE +
     knobRuntime(knobs) +
+    HELLO +
     `let __rerun=()=>{};` +
     `const root=document.querySelector('#root');` +
     `const report=()=>parent.postMessage({__sandboxHeight:document.body.scrollHeight},'*');` +
@@ -396,7 +402,7 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
         `const __loadExt=async()=>{for(const u of __fx){const r=await fetch(u);if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);const s=document.createElement('script');s.textContent=await r.text();document.head.appendChild(s)}};`
       : `const __loadExt=async()=>{};`) +
     FMT_ERR +
-    `const __fail=(e)=>{window.__sbxDead=true;const m=__fmt(e);document.body.innerHTML='<pre class=err>'+__esc(m)+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();parent.postMessage({__sandboxError:{message:m}},'*')};` +
+    `const __fail=(e)=>{window.__sbxDead=true;const m=__fmt(e);document.body.innerHTML='<pre class=err>'+__esc(m)+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();window.__sbxErr={message:m};parent.postMessage({__sandboxError:window.__sbxErr},'*')};` +
     `(async()=>{try{await __loadExt();const __comp=await loadModule('/__main__.vue',opts);let app=null;` +
       `const __mount=async()=>{__knobDefs=[];__knobN=0;app=Vue.createApp(__comp);${regs}app.mount(root);__knobReport()};` +
       `__rerun=async()=>{if(!app||window.__sbxDead)return;try{app.unmount();await __mount()}catch(e){__fail(e)}};` +
@@ -584,13 +590,14 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     `document.body.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[data-src]');if(!a)return;e.preventDefault();parent.postMessage({__sandboxGoto:{source:+a.dataset.src,line:+a.dataset.line}},'*')});` +
     `const showErr=(m,loc)=>{window.__sbxDead=true;const at=__preAt(loc),hint=__hint(at);` +
       `document.body.innerHTML='<pre class=err>'+(at?__hintHtml(at)+'\\n\\n':'')+__esc(m)+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();` +
-      `parent.postMessage({__sandboxError:{message:String(m),line:loc&&loc.line,col:loc&&loc.col,hint}},'*');report()};` +
+      `window.__sbxErr={message:String(m),line:loc&&loc.line,col:loc&&loc.col,hint};parent.postMessage({__sandboxError:window.__sbxErr},'*');report()};` +
     `addEventListener('error',e=>showErr(e.error?__fmt(e.error):e.message,__evLoc(e)));` +
     `addEventListener('unhandledrejection',e=>showErr(__fmt(e.reason),__pick(e.reason&&e.reason.stack)));`;
 
   const script =
     VIS_GATE +
     knobRuntime(knobs) +
+    HELLO +
     setup +
     resetVars +
     loopDef +
