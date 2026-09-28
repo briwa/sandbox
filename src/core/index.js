@@ -72,6 +72,32 @@ export function specToToolbar(spec = {}) {
 // What `viz` can be set to for a language: vue only ever mounts into a root.
 export const VIZ_SURFACES = { js: ['canvas', 'svg', 'root'], vue: ['root'] };
 
+// The toolbar state a fresh block opens with: a shared js block, sized like a figure would
+// be. Pass whatever should differ — `{ viz: 'canvas', w: 800, h: 400 }` opens on a canvas
+// of that size — and the rest fills in, so a host never has to spell out the whole shape.
+export function defaultToolbar(overrides = {}) {
+  const lang = overrides.lang === 'vue' ? 'vue' : 'js';
+  const state = {
+    lang,
+    viz: '',
+    w: DEFAULT_W,
+    h: DEFAULT_H,
+    bg: '',
+    showCode: false,
+    open: false,
+    control: 'pausable',
+    idle: 0,
+    meta: '',
+    label: '',
+    code: '',
+    ...overrides,
+  };
+  state.lang = lang;
+  // `viz: true` is the shorthand for "visualize it", on the language's first surface.
+  if (state.viz === true || (state.viz && !VIZ_SURFACES[lang].includes(state.viz))) state.viz = VIZ_SURFACES[lang][0];
+  return state;
+}
+
 const DECLARATIONS = [
   /^(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/,
   /^(?:export\s+(?:default\s+)?)?class\s+([A-Za-z_$][\w$]*)/,

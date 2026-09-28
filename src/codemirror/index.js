@@ -1,7 +1,7 @@
 import { Decoration, EditorView, WidgetType, ViewPlugin, keymap } from '@codemirror/view';
 import { EditorState, StateField, Prec, Transaction, MapMode } from '@codemirror/state';
 import { autocompletion, completionStatus } from '@codemirror/autocomplete';
-import { describeSandboxBlock, findSandboxBlocks } from '../core/index.js';
+import { describeSandboxBlock, findSandboxBlocks, defaultToolbar } from '../core/index.js';
 import { iconSvg, KIND_ICONS } from '../core/icons.js';
 
 function iconChip(name, title) {
@@ -34,7 +34,11 @@ function toolBtn(className, label, onClick, icon) {
   return btn;
 }
 
-export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confirm(m) } = {}) {
+// `defaults` seeds every block `/sandbox` opens — `{ viz: 'canvas', w: 800, h: 400 }` starts
+// each new one on a canvas of that size. It reaches `onCreate` filled out as its third
+// argument, ready to hand to the editor as `initial`.
+export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => window.confirm(m) } = {}) {
+  const create = (kind, pos) => onCreate?.(kind, pos, kind === 'external' ? { code: '', label: '' } : defaultToolbar(defaults));
 
   function blockActions(view, block) {
     return [
@@ -318,7 +322,8 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
     }
   );
 
-  // Two commands is the whole surface: language and viz are picked in the modal.
+  // Two commands is the whole surface: `/sandbox` opens as a shared source block, and
+  // language and viz are picked in the modal.
   const COMMANDS = { '/sandbox': 'figure', '/sandbox-external': 'external' };
   const slashCommand = Prec.high(keymap.of([{
     key: 'Enter',
@@ -329,13 +334,13 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
       const kind = COMMANDS[line.text.trim()];
       if (!kind) return false;
       view.dispatch({ changes: { from: line.from, to: line.to, insert: '' } });
-      onCreate?.(kind, line.from);
+      create(kind, line.from);
       return true;
     },
   }]));
 
   const SLASH_OPTIONS = [
-    { label: '/sandbox', kind: 'figure', detail: 'figure or shared source' },
+    { label: '/sandbox', kind: 'figure', detail: 'shared source or figure' },
     { label: '/sandbox-external', kind: 'external', detail: 'external library' },
   ];
   const slashComplete = autocompletion({
@@ -354,7 +359,7 @@ export function sandboxPreview({ onEdit, onCreate, confirm = (m) => window.confi
 
           apply: (view) => {
             view.dispatch({ changes: { from: line.from, to: line.to, insert: '' } });
-            onCreate?.(o.kind, line.from);
+            create(o.kind, line.from);
           },
         })),
       };

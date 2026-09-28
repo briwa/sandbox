@@ -138,8 +138,6 @@ export function mountFigures({
   const onToggle = (e) => {
     const copyBtn = e.target.closest('.sandbox-copy');
     if (copyBtn) {
-      // Inside a <summary>, a click would otherwise fold the block shut.
-      e.preventDefault();
       const code = copyBtn.closest('.sandbox')?.querySelector('.sandbox-code, pre');
       if (!code || !navigator.clipboard) return;
       navigator.clipboard.writeText(code.textContent).then(() => {
@@ -155,7 +153,10 @@ export function mountFigures({
     if (!fig) return;
     const showingCode = fig.getAttribute('data-mode') === 'code';
     fig.setAttribute('data-mode', showingCode ? 'preview' : 'code');
-    setBtn(btn, showingCode ? 'code' : 'eye', showingCode ? 'Show code' : 'Show preview');
+    // A figure swaps its code for the preview; a shared block has nothing to swap it for,
+    // so its button only ever shows or hides the code.
+    if (fig.classList.contains('sandbox-lib')) setBtn(btn, showingCode ? 'code' : 'codeOff', showingCode ? 'Show code' : 'Hide code');
+    else setBtn(btn, showingCode ? 'code' : 'eye', showingCode ? 'Show code' : 'Show preview');
   };
   if (toggle) document.addEventListener('click', onToggle);
 

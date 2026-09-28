@@ -10,7 +10,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { codeServices } from '@briwa.dev/sandbox/editor';
 import { sandboxPreview } from '@briwa.dev/sandbox/codemirror';
 import { SandboxModal, SandboxExternalModal } from '@briwa.dev/sandbox/react';
-import { findSandboxBlocks, describeSandboxBlock, specToToolbar, DEFAULT_W, DEFAULT_H } from '@briwa.dev/sandbox';
+import { findSandboxBlocks, describeSandboxBlock, specToToolbar } from '@briwa.dev/sandbox';
 
 const START = `# An entry with figures
 
@@ -78,17 +78,10 @@ function Editor() {
     else setEditing({ ...base, modal: 'sandbox', initial: { ...specToToolbar(block), code: block.code } });
   };
 
-  onCreateRef.current = (kind, pos) => {
+  // `initial` arrives from sandboxPreview already filled out from its `defaults`.
+  onCreateRef.current = (kind, pos, initial) => {
     const base = { from: pos, to: pos, siblings: siblingsNow() };
-    if (kind === 'external') return setEditing({ ...base, modal: 'external', initial: { code: '', label: '' } });
-    setEditing({
-      ...base,
-      modal: 'sandbox',
-      initial: {
-        lang: 'js', viz: 'canvas',
-        w: DEFAULT_W, h: DEFAULT_H, bg: '', showCode: false, open: false, control: 'pausable', meta: '', label: '', code: '',
-      },
-    });
+    setEditing({ ...base, modal: kind === 'external' ? 'external' : 'sandbox', initial });
   };
 
   useEffect(() => {
@@ -100,7 +93,9 @@ function Editor() {
           markdown(),
           sandboxPreview({
             onEdit: (b) => onEditRef.current?.(b),
-            onCreate: (kind, pos) => onCreateRef.current?.(kind, pos),
+            onCreate: (kind, pos, initial) => onCreateRef.current?.(kind, pos, initial),
+            // What `/sandbox` opens with; a shared block is the default when this is left out.
+            defaults: { w: 480, h: 240 },
           }),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) setOutline(readOutline(u.state.doc.toString()));

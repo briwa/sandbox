@@ -14,13 +14,17 @@ import { iconSvg, KIND_ICONS } from '../core/icons.js';
 
 const copyButton = `<button class="sandbox-copy" type="button" title="Copy code" aria-label="Copy code">${iconSvg('copy')}</button>`;
 
-const libSummary = (kind, label) =>
-  `<summary><span class="sandbox-lib-label">${escapeHtml(label)}</span>` +
+const libHead = (kind, label) =>
+  `<div class="sandbox-stage sandbox-lib-head"><span class="sandbox-lib-label">${escapeHtml(label)}</span>` +
   (KIND_ICONS[kind] ?? KIND_ICONS.source)
     .map(([icon, title]) => `<span class="sandbox-lib-tag" title="${title}" aria-label="${title}">${iconSvg(icon, 13)}</span>`)
     .join('') +
-  (kind === 'external' ? '' : copyButton) +
-  `</summary>`;
+  `</div>`;
+
+const codeToggle = (showing) =>
+  showing
+    ? `<button class="sandbox-toggle" type="button" title="Hide code" aria-label="Hide code">${iconSvg('codeOff')}</button>`
+    : `<button class="sandbox-toggle" type="button" title="Show code" aria-label="Show code">${iconSvg('code')}</button>`;
 
 const plainHighlight = (code) => `<pre class="astro-code"><code>${escapeHtml(code)}</code></pre>`;
 
@@ -70,15 +74,22 @@ export function remarkSandbox({ highlight } = {}) {
       found.map(async ({ parent, index, spec, code }) => {
         const { kind, label } = describeSandboxBlock({ ...spec, code });
 
+        // A shared block wears the same chrome as a figure: a head stands where the frame
+        // would be, and showing the code swaps it out the same way — `data-mode` decides
+        // which of the two is on screen, with the tools in the corner either way.
         if (kind !== 'figure') {
           const body = kind === 'external' ? externalUrlList(code) : await highlightCode(code, spec.lang);
           parent.children[index] = {
             type: 'html',
             value:
-              `<details class="sandbox sandbox-lib${kind === 'external' ? ' sandbox-external' : ''}"${spec.open ? ' open' : ''}>` +
-              libSummary(kind, label) +
-              body +
-              `</details>`,
+              `<figure class="sandbox sandbox-lib" data-kind="${kind}" data-mode="${spec.open ? 'code' : 'preview'}">` +
+              libHead(kind, label) +
+              `<div class="sandbox-code">${body}</div>` +
+              `<div class="sandbox-tools">` +
+              (kind === 'external' ? '' : copyButton) +
+              codeToggle(spec.open) +
+              `</div>` +
+              `</figure>`,
           };
           return;
         }
@@ -106,7 +117,7 @@ export function remarkSandbox({ highlight } = {}) {
               copyButton +
               (spec.open
                 ? `<button class="sandbox-toggle" type="button" title="Show preview" aria-label="Show preview">${iconSvg('eye')}</button>`
-                : `<button class="sandbox-toggle" type="button" title="Show code" aria-label="Show code">${iconSvg('code')}</button>`) +
+                : codeToggle(false)) +
               `</div>`
             : '') +
           `</figure>`;

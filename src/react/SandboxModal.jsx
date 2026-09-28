@@ -20,6 +20,7 @@ import {
   MSG_CONSOLE,
   VIZ_SURFACES,
   CONTROL_MODES,
+  defaultToolbar,
   buildSandboxFence,
   buildSrcdoc,
   buildVueSrcdoc,
@@ -61,10 +62,12 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const isInline = variant === "inline";
 
   const [restored] = useState(() => (draftKey ? loadSandboxDraft(draftKey) : null));
-  const seed = restored ?? initial;
+  // `initial` may be partial — just the values a host wants to differ from a fresh block.
+  const [seed] = useState(() => restored ?? defaultToolbar(initial));
 
   const [lang, setLang] = useState(seed.lang === "vue" ? "vue" : "js");
-  const [viz, setViz] = useState(seed.viz ?? "canvas");
+  // `/sandbox` opens as a shared source block; visualizing is opted into in the settings.
+  const [viz, setViz] = useState(seed.viz ?? "");
   const [w, setW] = useState(seed.w || 640);
   const [h, setH] = useState(seed.h || 360);
   const [bg, setBg] = useState(seed.bg || "");
@@ -76,8 +79,8 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [label, setLabel] = useState(seed.label || "");
 
   const [srcdoc, setSrcdoc] = useState("");
-  const [previewW, setPreviewW] = useState(initial.w || 640);
-  const [previewH, setPreviewH] = useState(initial.h || 360);
+  const [previewW, setPreviewW] = useState(seed.w || 640);
+  const [previewH, setPreviewH] = useState(seed.h || 360);
   const [playing, setPlaying] = useState(false);
   const [logs, setLogs] = useState([]);
 

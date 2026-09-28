@@ -43,30 +43,27 @@
 .sandbox-copy:hover { color: var(--sbx-ink); }
 .sandbox[data-mode='preview'] .sandbox-copy { display: none; }
 
-.sandbox-lib > summary {
+/* A shared block has no frame, so the card the editor draws for it stands in as the stage:
+   a head with the label and its kind tags, which the code replaces when shown. The tools
+   sit in the corner just as they do on a figure, so the head keeps room for them. */
+.sandbox-lib-head {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  cursor: pointer;
-  color: var(--sbx-muted);
-  font-size: 0.85rem;
-  list-style: none;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 4.6rem 0.55rem 0.7rem;
+  color: var(--sbx-ink);
+  font-size: 0.78rem;
+  border: 1px solid var(--sbx-rule);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sbx-ink) 3%, transparent);
 }
-.sandbox-lib > summary::-webkit-details-marker { display: none; }
-.sandbox-lib > summary::before {
-  content: '';
-  width: 0; height: 0;
-  border-left: 6px solid currentColor;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
-  transition: transform 0.15s;
-}
-.sandbox-lib[open] > summary::before { transform: rotate(90deg); }
-.sandbox-lib > summary .sandbox-copy { margin-left: auto; }
-.sandbox-lib:not([open]) .sandbox-copy { display: none; }
-.sandbox-lib > summary:hover { color: var(--sbx-ink); }
-.sandbox-lib > summary:hover .sandbox-lib-tag { background: var(--sbx-ink); }
-.sandbox-lib > pre { margin: 0.6rem 0 0; }
+/* No frame height to match, so the code takes its own — never shorter than the head it
+   replaces, or the corner tools would hang off a one-liner. */
+.sandbox-lib .sandbox-code > pre,
+.sandbox-lib .sandbox-external-urls { box-sizing: border-box; height: auto; min-height: 2.5rem; }
 .sandbox-lib-tag {
   display: inline-flex;
   align-items: center;
@@ -77,13 +74,15 @@
   padding: 0.22rem 0.28rem;
 }
 .sandbox-lib-label {
+  max-width: min(34ch, 100%);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sandbox-external-urls {
-  margin: 0.6rem 0 0;
+  margin: 0;
+  padding-right: 2.6rem;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
