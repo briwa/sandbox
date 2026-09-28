@@ -13,3 +13,7 @@ export const MSG_PAUSE = '__figpause';
 export const MSG_RESET = '__figreset';
 
 export const MSG_CONSOLE = '__sandboxConsole';
+
+// A figure reports the knobs its code declared once it has run; the host answers with values.
+export const MSG_KNOBS = '__sandboxKnobs';
+export const MSG_KNOB = '__sbxKnob';

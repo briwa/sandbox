@@ -22,11 +22,14 @@ const wave = (t, i) => Math.sin(t / 500 + i / 3);
 \`\`\`
 
 \`\`\`sandbox=js viz 460x200 control=auto label="Marching squares"
+const gap = knob(32, { min: 20, max: 48 });
+const size = knob(16, { min: 4, max: 32 });
+
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = 'currentColor';
   for (let i = 0; i < 14; i++) {
-    ctx.fillRect(20 + i * 32, height / 2 + wave(t, i) * 60, 16, 16);
+    ctx.fillRect(20 + i * gap, height / 2 + wave(t, i) * 60, size, size);
   }
 });
 \`\`\`

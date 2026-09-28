@@ -1,5 +1,8 @@
-import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET } from '../core/protocol.js';
+import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KNOBS } from '../core/protocol.js';
 import { iconSvg } from '../core/icons.js';
+import { attachFigureKnobs, toggleFigureKnobs, closeFigureKnobs, knobMessage, knobResetMessage } from './knobs.js';
+
+export { knobsPanel, knobsSignature, attachFigureKnobs, toggleFigureKnobs, closeFigureKnobs } from './knobs.js';
 
 let bgVar = '--bg';
 
@@ -40,6 +43,10 @@ export const resetFigure = (target) => postToFigure(target, { [MSG_RESET]: true 
 // wires these for you; call them directly to drive a figure from a larger region, like a card.
 export const enterFigure = (target) => postToFigure(target, { [MSG_PLAY]: true });
 export const leaveFigure = (target) => postToFigure(target, { [MSG_PLAY]: false });
+
+// Sets a knob from the page, the way the panel does: the figure re-runs with the new value.
+export const setFigureKnob = (target, key, value) => postToFigure(target, knobMessage(key, value));
+export const resetFigureKnobs = (target) => postToFigure(target, knobResetMessage());
 
 const HOVER_FIGURE = ".sandbox[data-control='hover']";
 
@@ -90,6 +97,7 @@ export function mountFigures({
   toggle = true,
   prime = true,
   hover = true,
+  knobs = true,
   onResize,
 } = {}) {
   const scope = () => (typeof root === 'function' ? root() : root);
@@ -101,6 +109,18 @@ export function mountFigures({
   syncHover?.();
 
   const onMessage = (e) => {
+    const defs = e.data && e.data[MSG_KNOBS];
+    if (Array.isArray(defs)) {
+      if (!knobs) return;
+      for (const f of frames()) {
+        if (f.contentWindow !== e.source) continue;
+        const fig = f.closest('.sandbox');
+        if (fig) attachFigureKnobs(fig, defs, (msg) => f.contentWindow?.postMessage(msg, '*'));
+        break;
+      }
+      return;
+    }
+
     const h = e.data && e.data[MSG_HEIGHT];
     if (typeof h !== 'number') return;
 
@@ -147,12 +167,19 @@ export function mountFigures({
       }, () => {});
       return;
     }
+    const knobBtn = e.target.closest('.sandbox-knobs-btn');
+    if (knobBtn) {
+      toggleFigureKnobs(knobBtn.closest('.sandbox'));
+      return;
+    }
     const btn = e.target.closest('.sandbox-toggle');
     if (!btn) return;
     const fig = btn.closest('.sandbox');
     if (!fig) return;
     const showingCode = fig.getAttribute('data-mode') === 'code';
     fig.setAttribute('data-mode', showingCode ? 'preview' : 'code');
+    // The stage goes away with the code in front, and the panel belongs to the stage.
+    toggleFigureKnobs(fig, false);
     // A figure swaps its code for the preview; a shared block has nothing to swap it for,
     // so its button only ever shows or hides the code.
     if (fig.classList.contains('sandbox-lib')) setBtn(btn, showingCode ? 'code' : 'codeOff', showingCode ? 'Show code' : 'Hide code');
@@ -160,10 +187,23 @@ export function mountFigures({
   };
   if (toggle) document.addEventListener('click', onToggle);
 
+  // A panel closes on a press anywhere else, or on Escape. A press on the frame itself never
+  // reaches this document, so the panel stays put while the figure is poked at.
+  const onDown = (e) => closeFigureKnobs(e.target);
+  const onKey = (e) => { if (e.key === 'Escape') closeFigureKnobs(null); };
+  if (knobs) {
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+  }
+
   return function stop() {
     window.removeEventListener('message', onMessage);
     window.removeEventListener('load', primeFigures);
     if (toggle) document.removeEventListener('click', onToggle);
+    if (knobs) {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    }
     stopTheme();
     vis.stop();
   };

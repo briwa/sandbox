@@ -307,15 +307,34 @@
 .sbx-ctl:hover { border-color: var(--sbx-ink); }
 .sbx-ctl.primary { color: var(--sbx-accent); border-color: var(--sbx-accent); }
 .sbx-ctl.sbx-icon { display: inline-flex; align-items: center; justify-content: center; padding: 0.35rem; }
+.sbx-frame-wrap { position: relative; flex: none; max-width: 100%; }
 .sbx-frame {
+  display: block;
   width: 100%;
-  flex: none;
   border: 0;
   outline: 1px solid var(--sbx-rule);
   outline-offset: -1px;
   border-radius: 6px;
   background: var(--sbx-surface);
 }
+/* The figure's own settings, in the frame's corner — the knobs panel hangs off the wrap. */
+.sbx-knobs-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  line-height: 1;
+  color: var(--sbx-muted);
+  background: var(--sbx-surface);
+  border: 1px solid var(--sbx-rule);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sbx-knobs-btn:hover,
+.sbx-knobs-btn[aria-expanded='true'] { color: var(--sbx-ink); }
 /* Fixed, the panel is the viewport, so the viewport is what to measure — and
    this rule must say so, or it stacks an inset panel that has plenty of room
    just because the window around it is small. */

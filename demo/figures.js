@@ -3,18 +3,23 @@ import './demo.css';
 import { renderMarkdown } from './render.js';
 
 const source = `
-## canvas
+## canvas (+ knobs)
 
 \`\`\`sandbox=js viz 480x260 control=auto code
+const count = knob(60, { min: 6, max: 120 });
+const radius = knob(70, { min: 20, max: 110 });
+const dot = knob(3, { min: 1, max: 8 });
+const filled = knob(true);
+
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
-  for (let i = 0; i < 60; i++) {
-    const a = (i / 60) * Math.PI * 2 + t / 2200;
-    const r = 70 + Math.sin(t / 700 + i / 5) * 26;
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 + t / 2200;
+    const r = radius + Math.sin(t / 700 + i / 5) * 26;
     ctx.beginPath();
-    ctx.arc(width / 2 + Math.cos(a) * r, height / 2 + Math.sin(a) * r, 3, 0, Math.PI * 2);
-    ctx.fillStyle = \`hsl(\${(i * 6 + t / 40) % 360} 70% 55%)\`;
-    ctx.fill();
+    ctx.arc(width / 2 + Math.cos(a) * r, height / 2 + Math.sin(a) * r, dot, 0, Math.PI * 2);
+    ctx.fillStyle = ctx.strokeStyle = \`hsl(\${(i * 6 + t / 40) % 360} 70% 55%)\`;
+    filled ? ctx.fill() : ctx.stroke();
   }
 });
 \`\`\`
@@ -80,13 +85,14 @@ root.append(btn);
 \`\`\`sandbox=vue viz 480x170 code
 <template>
   <div :style="box">
-    <button :style="btn" @click="n--">-</button>
+    <button :style="btn" @click="n -= step">-</button>
     <strong :style="{ fontSize: '28px', minWidth: '3ch', textAlign: 'center' }">{{ n }}</strong>
-    <button :style="btn" @click="n++">+</button>
+    <button :style="btn" @click="n += step">+</button>
   </div>
 </template>
 <script setup>
 import { ref } from 'vue';
+const step = knob(1, { min: 1, max: 10 });
 const n = ref(0);
 const box = { display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'center', height: '100%', font: '600 15px system-ui' };
 const btn = { font: 'inherit', fontSize: '20px', width: '38px', height: '38px', borderRadius: '8px', border: '1px solid currentColor', background: 'none', color: 'inherit', cursor: 'pointer' };

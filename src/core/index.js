@@ -45,6 +45,30 @@ const CONSOLE_HOOK =
 
 const consoleScript = (on) => (on ? `<script>${CONSOLE_HOOK}</script>` : '');
 
+// `knob(value, opts)` marks a value the reader can change from the figure's settings panel.
+// `const speed = knob(10)` is keyed by its variable name — the frame is handed the code with
+// that name spliced in, so the call itself stays short. A knob's shape is read off its default
+// (a number, a boolean, a `#hex` colour, a string, or one of `opts.options`) unless `opts.type`
+// says otherwise; `min`/`max` turn a number into a slider, and `label` renames it on the panel.
+// Changing one re-runs the figure with the new value, keeping its clock and playback state.
+const KNOB_DECL = /\b(const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*knob\s*\(/g;
+export const nameKnobs = (code) => String(code == null ? '' : code).replace(KNOB_DECL, '$1 $2 = __knob("$2",');
+
+// `values` seeds the knobs before the first run — how the editor keeps what was dialled in
+// across preview rebuilds. A value that no longer fits its knob's type falls back to the default.
+const knobRuntime = (values) =>
+  `let __ran=false,__knobVals=${JSON.stringify(values || {})},__knobDefs=[],__knobN=0,__knobSent=false,__rrq=false;` +
+  `const __knobType=(v,o)=>o.type||(typeof v==='boolean'?'boolean':typeof v==='number'?'number':Array.isArray(o.options)?'select':/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)?'color':'string');` +
+  `const __knob=(key,value,opts)=>{opts=opts||{};if(key==null)key=opts.label||'knob '+(++__knobN);` +
+    `const type=__knobType(value,opts),options=Array.isArray(opts.options)?opts.options.filter(x=>typeof x==='string'||typeof x==='number'):undefined;` +
+    `let cur=key in __knobVals?__knobVals[key]:value;` +
+    `if(type==='number'&&typeof cur!=='number'||type==='boolean'&&typeof cur!=='boolean'||type==='select'&&!(options||[]).includes(cur)||(type==='string'||type==='color')&&typeof cur!=='string')cur=value;` +
+    `__knobDefs.push({key,label:String(opts.label||key),type,value,cur,min:opts.min,max:opts.max,step:opts.step,options});return cur};` +
+  `const knob=(value,opts)=>__knob(null,value,opts);window.knob=knob;window.__knob=__knob;` +
+  `const __knobReport=()=>{if(!__knobDefs.length&&!__knobSent)return;__knobSent=true;parent.postMessage({__sandboxKnobs:__knobDefs},'*')};` +
+  `const __rerunSoon=()=>{if(__rrq)return;__rrq=true;requestAnimationFrame(()=>{__rrq=false;__rerun()})};` +
+  `addEventListener('message',e=>{const k=e.data&&e.data.__sbxKnob;if(!k)return;if(k.reset)__knobVals={};else __knobVals[k.key]=k.value;__rerunSoon()});`;
+
 // Who drives playback. The last two hand that job to the host page: `manual` waits for
 // play/pause/reset messages, `hover` runs only while the host says the pointer is on it.
 export const CONTROL_MODES = ['pausable', 'auto', 'none', 'manual', 'hover'];
@@ -316,7 +340,7 @@ export const escapeTemplate = (s) =>
     .replace(/<\/script>/gi, '<\\/script>') +
   '`';
 
-export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components = [], console: captureConsole = false } = {}) {
+export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components = [], console: captureConsole = false, knobs } = {}) {
 
   const fetched = (externals || []).filter(isRawGistUrl);
   const ext = (externals || [])
@@ -329,16 +353,19 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
   const css = `html,body{margin:0;overflow:hidden}${bgCss}${rootCss}canvas,svg{display:block;max-width:100%;height:auto;margin-inline:auto}.err{color:#c0392b;white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;padding:.75rem}`;
 
   const files = [
-    ...components.map((c) => `${JSON.stringify('/' + c.name + '.vue')}:${escapeTemplate(c.code)}`),
-    `${JSON.stringify('/__main__.vue')}:${escapeTemplate(code)}`,
+    ...components.map((c) => `${JSON.stringify('/' + c.name + '.vue')}:${escapeTemplate(nameKnobs(c.code))}`),
+    `${JSON.stringify('/__main__.vue')}:${escapeTemplate(nameKnobs(code))}`,
   ].join(',');
 
   const regs = components
     .map((c) => `app.component(${JSON.stringify(c.name)},await loadModule(${JSON.stringify('/' + c.name + '.vue')},opts));`)
     .join('');
 
+  // A knob change remounts the app: `<script setup>` runs again and reads the new values.
   const script =
     VIS_GATE +
+    knobRuntime(knobs) +
+    `let __rerun=()=>{};` +
     `const root=document.querySelector('#root');` +
     `const report=()=>parent.postMessage({__sandboxHeight:document.body.scrollHeight},'*');` +
     `new ResizeObserver(report).observe(document.documentElement);` +
@@ -350,12 +377,16 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
       ? `const __fx=[${fetched.map((u) => JSON.stringify(u)).join(',')}];` +
         `const __loadExt=async()=>{for(const u of __fx){const r=await fetch(u);if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);const s=document.createElement('script');s.textContent=await r.text();document.head.appendChild(s)}};`
       : `const __loadExt=async()=>{};`) +
-    `(async()=>{try{await __loadExt();const app=Vue.createApp(await loadModule('/__main__.vue',opts));${regs}app.mount(root)}catch(e){const m=String(e&&e.stack||e);document.body.innerHTML='<pre class=err>'+m+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();parent.postMessage({__sandboxError:{message:m}},'*')}report()})();`;
+    `const __fail=(e)=>{window.__sbxDead=true;const m=String(e&&e.stack||e);document.body.innerHTML='<pre class=err>'+m+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();parent.postMessage({__sandboxError:{message:m}},'*')};` +
+    `(async()=>{try{await __loadExt();const __comp=await loadModule('/__main__.vue',opts);let app=null;` +
+      `const __mount=async()=>{__knobDefs=[];__knobN=0;app=Vue.createApp(__comp);${regs}app.mount(root);__knobReport()};` +
+      `__rerun=async()=>{if(!app||window.__sbxDead)return;try{app.unmount();await __mount()}catch(e){__fail(e)}};` +
+      `await __mount()}catch(e){__fail(e)}report()})();`;
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>${consoleScript(captureConsole)}</head><body><div id="root"></div>${ext}<script src="${VUE_SRC}"></script><script src="${SFC_LOADER_SRC}"></script><script>${script}</script></body></html>`;
 }
 
-export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: captureConsole }, code, prelude = '', externals = []) {
+export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: captureConsole, knobs }, code, prelude = '', externals = []) {
   const isCanvas = preset === 'canvas';
 
   const isRoot = preset === 'root';
@@ -363,8 +394,12 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const isManual = mode === 'manual';
   const isHover = Boolean(hover) || mode === 'hover';
   const idleT = Math.max(0, Number(idle) || 0);
-  const idleArg = idleT ? `__idle?${idleT}:0` : '0';
+  // The frame a fresh `loop` draws first: the idle frame while parked there, otherwise the
+  // clock as it stands — zero on a first run, and wherever it got to when a knob re-runs it.
+  const startT = idleT ? `__idle?${idleT}:__now` : '__now';
   const idleVar = idleT ? ',__idle=true' : '';
+  const body = nameKnobs(code);
+  const pre = nameKnobs(prelude);
   const idleHome = idleT ? '__idle=true;' : '';
   const leaveIdle = (teardown) =>
     idleT ? `const __leaveIdle=()=>{if(__idle){__idle=false;${teardown}run()}};` : `const __leaveIdle=()=>{};`;
@@ -423,20 +458,22 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
       `const start=()=>__fx.reduce((p,u)=>p.then(()=>fetch(u)).then(r=>{if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);return r.text()}).then(t=>{const s=document.createElement('script');s.textContent=t;document.head.appendChild(s)}),Promise.resolve()).then(run,e=>{document.body.innerHTML='<pre class=err>'+(e&&e.stack||e)+'</pre>';report()});`
     : `const start=run;`;
 
-  const resettable = (isCanvas || isRoot) && !isHover;
+  // Everything but a hover figure can be torn down and run again: that is what reset, and a
+  // knob change, do. svg has no loop to stop, but its drawing still has to be cleared.
+  const resettable = !isHover;
+  const clearSurface = isCanvas ? 'canvas.width=width' : isRoot ? "root.innerHTML=''" : "svg.innerHTML=''";
+  // The loops that keep their own clock, so a re-run can pick up where they were.
+  const timed = pausable || isManual;
 
   const loopDef = isHover
-    ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${idleArg})};`
+    ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${startT})};`
     : isManual
 
-      ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${idleArg});${resettable ? `__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}};return __stop` : `return ()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}}`}};`
+      ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${startT});__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}};return __stop};`
       : pausable
 
-        ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{if(__stop)__stop();__fn=fn;fn(${idleArg});return (__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}})};`
-      : resettable
-
-        ? `const loop=(fn)=>{if(__stop)__stop();let id,live=true,t0=null;const t=(ts)=>{if(t0==null)t0=ts;fn(ts-t0);if(live)id=requestAnimationFrame(t)};id=requestAnimationFrame(t);return (__stop=()=>{live=false;cancelAnimationFrame(id)})};`
-        : `const loop=(fn)=>{let id;const t=(ts)=>{fn(ts);id=requestAnimationFrame(t)};id=requestAnimationFrame(t);return ()=>cancelAnimationFrame(id)};`;
+        ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{if(__stop)__stop();__fn=fn;fn(${startT});return (__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}})};`
+        : `const loop=(fn)=>{if(__stop)__stop();let id,live=true,t0=null;const t=(ts)=>{if(t0==null)t0=ts;fn(ts-t0);if(live)id=requestAnimationFrame(t)};id=requestAnimationFrame(t);return (__stop=()=>{live=false;cancelAnimationFrame(id)})};`;
 
   const resetVars = resettable ? `let __stop=null,__cleanups=[];` : '';
 
@@ -451,14 +488,18 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
 
   const resetApi = resettable
     ? `const onCleanup=(fn)=>{__cleanups.push(fn)};` +
-      `const __teardown=()=>{if(__stop){__stop();__stop=null}__cleanups.forEach(function(fn){try{fn()}catch(_){}});__cleanups=[];${isCanvas ? 'canvas.width=width' : "root.innerHTML=''"}};` +
+      `const __teardown=()=>{if(__stop){__stop();__stop=null}__cleanups.forEach(function(fn){try{fn()}catch(_){}});__cleanups=[];${clearSurface}};` +
       `const reset=()=>{__teardown();${resetHome};parent.postMessage({__sandboxReset:1},'*')};` +
       leaveIdle('__teardown();')
-    : isHover
+    : `const onCleanup=()=>{};const reset=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}${idleHome}__el=0;__t0=null;__now=0;__fn=null;run()};` +
+      leaveIdle('');
 
-      ? `const onCleanup=()=>{};const reset=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}${idleHome}__el=0;__t0=null;__now=0;__fn=null;run()};` +
-        leaveIdle('')
-      : `const onCleanup=()=>{};const reset=()=>{};` + leaveIdle('');
+  // A knob change runs the code again in place. Unlike reset it keeps the clock and whether
+  // the figure was going, so dragging a slider tunes the animation instead of restarting it.
+  // Nothing to re-run until the first run has happened, or once an error has replaced the page.
+  const rerun = resettable
+    ? `const __rerun=()=>{if(!__ran||window.__sbxDead)return;${timed ? 'const on=__raf!=null;if(on)__el=__now;' : ''}__teardown();${timed ? '__fn=null;' : ''}run();${timed ? 'if(on&&__fn&&__raf==null){__t0=null;__raf=requestAnimationFrame(__tick)}' : ''}};`
+    : `const __rerun=()=>{if(!__ran||window.__sbxDead)return;const on=__raf!=null;if(on){cancelAnimationFrame(__raf);__raf=null;__el=__now}__fn=null;${clearSurface};run();if(on&&__fn){__t0=null;__raf=requestAnimationFrame(__tick)}};`;
 
   const pauseControls = pausable
     ? `const __ctl=document.getElementById('__ctl');` +
@@ -480,7 +521,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
       : playSetup + `__play.addEventListener('click',()=>{__play.style.display='none';start()});report();`
     : isManual
 
-      ? `start();addEventListener('message',function(e){if(!e.data)return;if(e.data.__figpause){if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now}}else if(e.data.__figplay){if(__raf==null&&__fn){__leaveIdle();__t0=null;__raf=requestAnimationFrame(__tick)}}${resettable ? `else if(e.data.__figreset){reset()}` : ''}});`
+      ? `start();addEventListener('message',function(e){if(!e.data)return;if(e.data.__figpause){if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now}}else if(e.data.__figplay){if(__raf==null&&__fn){__leaveIdle();__t0=null;__raf=requestAnimationFrame(__tick)}}else if(e.data.__figreset){reset()}});`
       : isHover
 
         ? `start();addEventListener('message',function(e){if(!__fn||!e.data)return;if(e.data.__figplay){if(__raf==null){__leaveIdle();__t0=null;__raf=requestAnimationFrame(__tick)}}else if('__figplay' in e.data){reset()}});`
@@ -490,7 +531,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   // number reported from inside the frame maps back to an editor line by subtracting this
   // base. Prelude lines land at zero or below, which the host reads as "thrown in a shared
   // source, not in this block".
-  const lineBase = 1 + String(prelude).split('\n').length;
+  const lineBase = 1 + pre.split('\n').length;
 
   const errorReporting =
     `const report=()=>parent.postMessage({__sandboxHeight:document.body.scrollHeight},'*');` +
@@ -499,7 +540,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     `const __pick=(s)=>{const hits=String(s||'').match(/[^\\s()]+:\\d+:\\d+/g)||[];` +
       `for(const hit of hits){const p=/^(.*):(\\d+):(\\d+)$/.exec(hit);if(!__own(p[1]))continue;return{line:+p[2]-__base,col:+p[3]}}return null};` +
     `const __evLoc=(e)=>e.lineno&&__own(e.filename)?{line:e.lineno-__base,col:e.colno||0}:__pick(e.error&&e.error.stack);` +
-    `const showErr=(m,loc)=>{const hint=loc&&loc.line<1?'Thrown in a shared source block.\\n\\n':'';` +
+    `const showErr=(m,loc)=>{window.__sbxDead=true;const hint=loc&&loc.line<1?'Thrown in a shared source block.\\n\\n':'';` +
       `document.body.innerHTML='<pre class=err>'+hint+m+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();` +
       `parent.postMessage({__sandboxError:{message:String(m),line:loc&&loc.line,col:loc&&loc.col}},'*');report()};` +
     `addEventListener('error',e=>showErr((e.error&&e.error.stack)||e.message,__evLoc(e)));` +
@@ -507,13 +548,15 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
 
   const script =
     VIS_GATE +
+    knobRuntime(knobs) +
     setup +
     resetVars +
     loopDef +
     resetApi +
+    rerun +
     `new ResizeObserver(report).observe(document.documentElement);` +
     themeSync +
-    `const run=()=>{try{\n${prelude}\n${code}\n}catch(e){showErr(e&&e.stack||e,__pick(e&&e.stack));return}report()};` +
+    `const run=()=>{__ran=true;__knobDefs=[];__knobN=0;try{\n${pre}\n${body}\n}catch(e){showErr(e&&e.stack||e,__pick(e&&e.stack));return}report();__knobReport()};` +
     loadExt +
     tail;
 

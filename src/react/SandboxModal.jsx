@@ -11,6 +11,7 @@ import PreviewConsole, { appendConsole } from "./PreviewConsole.jsx";
 import { codeServices } from "../editor/services.js";
 import { showError, clearError } from "../editor/errors.js";
 import { figureBg } from "../client/index.js";
+import { knobsPanel, knobsSignature, knobMessage, knobResetMessage } from "../client/knobs.js";
 import { codeHighlightStyle } from "../editor/highlight.js";
 import { loadSandboxDraft, saveSandboxDraft, clearSandboxDraft } from "./storage.js";
 import { targetIdentity } from "./target.js";
@@ -18,6 +19,7 @@ import { getCodeFenceSetting, setCodeFenceSetting } from "./storage.js";
 import {
   MSG_ERROR,
   MSG_CONSOLE,
+  MSG_KNOBS,
   VIZ_SURFACES,
   CONTROL_MODES,
   defaultToolbar,
@@ -33,15 +35,16 @@ const langCompartment = new Compartment();
 
 const langSupport = (name) => (name === "vue" ? vue() : javascript());
 
-function buildPreview({ lang, viz, w, h, bg, idle }, code, siblings) {
+function buildPreview({ lang, viz, w, h, bg, idle, knobs }, code, siblings) {
   if (lang === "vue") {
     return buildVueSrcdoc({ w, h, bg }, code, {
       externals: sandboxExternals(siblings),
       components: sandboxVueComponents(siblings),
       console: true,
+      knobs,
     });
   }
-  const spec = { preset: viz, w, h, bg, control: 'manual', idle, console: true };
+  const spec = { preset: viz, w, h, bg, control: 'manual', idle, console: true, knobs };
   return buildSrcdoc(spec, code, sandboxPrelude(siblings), sandboxExternals(siblings));
 }
 
@@ -93,6 +96,16 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(() => getCodeFenceSetting("previewOpen", true));
 
+  // The knobs the running preview declared. Only their shape is state — a value-only report
+  // must not rebuild the panel mid-drag — while the values dialled in live in a ref and are
+  // seeded back into every rebuilt preview, so a code edit does not undo the tuning.
+  const [knobSig, setKnobSig] = useState("");
+  const [knobsOpen, setKnobsOpen] = useState(false);
+  const knobDefsRef = useRef([]);
+  const knobValsRef = useRef({});
+  const knobsRef = useRef(null);
+  const knobHostRef = useRef(null);
+
   const modalRef = useRef(null);
   const bodyRef = useRef(null);
   const hostRef = useRef(null);
@@ -124,7 +137,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     const height = Number(h) || 0;
 
     clearError(cmRef.current);
-    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg(), idle: Number(idle) || 0 }, body, siblings));
+    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg(), idle: Number(idle) || 0, knobs: knobValsRef.current }, body, siblings));
     setPreviewW(width || 640);
     setPreviewH(height || 360);
     setFrameKey((k) => k + 1);
@@ -248,7 +261,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     return () => { clearTimeout(saveTimer.current); window.removeEventListener("pagehide", flush); };
   }, []);
 
-  useEffect(() => { setPlaying(false); setLogs([]); }, [frameKey]);
+  useEffect(() => { setPlaying(false); setLogs([]); knobDefsRef.current = []; setKnobSig(""); }, [frameKey]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -258,9 +271,28 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   }, [settingsOpen]);
 
   useEffect(() => {
+    if (!knobsOpen) return;
+    const onDown = (e) => { if (!knobsRef.current?.contains(e.target)) setKnobsOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [knobsOpen]);
+
+  useEffect(() => {
+    const host = knobHostRef.current;
+    if (!host || !knobSig) return;
+    const post = (msg) => frameRef.current?.contentWindow?.postMessage(msg, "*");
+    host.replaceChildren(knobsPanel(knobDefsRef.current, {
+      onChange: (key, value) => { knobValsRef.current[key] = value; post(knobMessage(key, value)); },
+      onReset: () => { knobValsRef.current = {}; post(knobResetMessage()); },
+    }));
+  }, [knobSig, knobsOpen]);
+
+  useEffect(() => {
     const onMessage = (e) => {
       if (!frameRef.current || frameRef.current.contentWindow !== e.source || !e.data) return;
       if (e.data.__sandboxReset) { setPlaying(false); return; }
+      const defs = e.data[MSG_KNOBS];
+      if (Array.isArray(defs)) { knobDefsRef.current = defs; setKnobSig(knobsSignature(defs)); return; }
       const out = e.data[MSG_CONSOLE];
       if (Array.isArray(out)) { setLogs((prev) => appendConsole(prev, out)); return; }
       const err = e.data[MSG_ERROR];
@@ -359,6 +391,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const escapeRef = useRef(null);
   escapeRef.current = () => {
     if (settingsOpen) { setSettingsOpen(false); return true; }
+    if (knobsOpen) { setKnobsOpen(false); return true; }
     const view = cmRef.current;
     if (view && view.state.selection.ranges.length > 1) {
       view.dispatch({ selection: view.state.selection.asSingle() });
@@ -508,15 +541,30 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
         {isFigure && (
           <div className="sbx-preview" hidden={!previewOpen}>
             <div className="sbx-preview-stage">
-              <iframe
-                key={frameKey}
-                ref={frameRef}
-                className="sbx-frame"
-                style={{ width: `${previewW}px`, maxWidth: "100%", aspectRatio: `${previewW} / ${previewH}` }}
-                sandbox="allow-scripts"
-                title="live figure preview"
-                srcDoc={srcdoc}
-              />
+              <div className="sbx-frame-wrap" ref={knobsRef} style={{ width: `${previewW}px` }}>
+                <iframe
+                  key={frameKey}
+                  ref={frameRef}
+                  className="sbx-frame"
+                  style={{ aspectRatio: `${previewW} / ${previewH}` }}
+                  sandbox="allow-scripts"
+                  title="live figure preview"
+                  srcDoc={srcdoc}
+                />
+                {knobSig && (
+                  <button
+                    className="sbx-knobs-btn"
+                    onClick={() => setKnobsOpen((o) => !o)}
+                    title="Settings"
+                    aria-label="Figure settings"
+                    aria-haspopup="true"
+                    aria-expanded={knobsOpen}
+                  >
+                    <Icon name="settings" size={14} />
+                  </button>
+                )}
+                {knobSig && knobsOpen && <div ref={knobHostRef} />}
+              </div>
               {hasPreviewControls && (
                 <div className="sbx-controls" role="toolbar" aria-label="Preview controls">
                   <button className="sbx-ctl sbx-icon" onClick={togglePlay} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
