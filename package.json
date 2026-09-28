@@ -1,6 +1,6 @@
 {
   "name": "@briwa.dev/sandbox",
-  "version": "0.5.13",
+  "version": "0.6.0",
   "description": "Interactive figure sandboxes: a fenced code block becomes a live, isolated iframe figure.",
   "type": "module",
   "license": "MIT",
