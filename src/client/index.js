@@ -1,4 +1,4 @@
-import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KNOBS, MSG_HELLO, MSG_GOTO } from '../core/protocol.js';
+import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KNOBS, MSG_HELLO, MSG_GOTO, MSG_PRESS } from '../core/protocol.js';
 import { iconSvg } from '../core/icons.js';
 import { attachFigureKnobs, toggleFigureKnobs, closeFigureKnobs, knobMessage, knobResetMessage } from './knobs.js';
 
@@ -181,6 +181,12 @@ export function mountFigures({
       return;
     }
 
+    if (e.data && e.data[MSG_PRESS]) {
+      const from = [...frames()].find((f) => f.contentWindow === e.source);
+      if (from && knobs) closeFigureKnobs(from, scope());
+      return;
+    }
+
     const goto = e.data && e.data[MSG_GOTO];
     if (goto) {
       const from = [...frames()].find((f) => f.contentWindow === e.source);
@@ -252,8 +258,7 @@ export function mountFigures({
   if (toggle) document.addEventListener('click', onToggle);
   document.addEventListener('pointerdown', clearHit);
 
-  // A panel closes on a press anywhere else, or on Escape. A press on the frame itself never
-  // reaches this document, so the panel stays put while the figure is poked at.
+  // A panel closes on a press anywhere else, or on Escape. A press on a frame arrives as a message.
   const onDown = (e) => closeFigureKnobs(e.target);
   const onKey = (e) => { if (e.key === 'Escape') closeFigureKnobs(null); };
   if (knobs) {

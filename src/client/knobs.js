@@ -20,6 +20,32 @@ const fmt = (n) => (Number.isInteger(n) ? String(n) : String(+Number(n).toFixed(
 // A colour input only speaks six-digit hex.
 const hex6 = (c) => (/^#[0-9a-f]{3}$/i.test(c) ? '#' + c.slice(1).split('').map((x) => x + x).join('') : c);
 
+const RGB = ['r', 'g', 'b'];
+const isRgb = (c) => c != null && typeof c === 'object' && RGB.every((k) => typeof c[k] === 'number');
+const rgbRanged = (d) => isRgb(d.min) && isRgb(d.max) && RGB.some((k) => d.min[k] !== d.max[k]);
+const byte = (n) => Math.max(0, Math.min(255, Math.round(n)));
+const rgbHex = (c) => '#' + RGB.map((k) => byte(c[k]).toString(16).padStart(2, '0')).join('');
+const hexRgb = (h) => Object.fromEntries(RGB.map((k, i) => [k, parseInt(h.slice(1 + i * 2, 3 + i * 2), 16)]));
+const rgbCss = (c) => `rgb(${RGB.map((k) => byte(c[k])).join(' ')})`;
+
+const mixRgb = (d, t) =>
+  Object.fromEntries(RGB.map((k) => {
+    const v = d.min[k] + (d.max[k] - d.min[k]) * t;
+    return [k, isInt(d.min[k]) && isInt(d.max[k]) ? Math.round(v) : v];
+  }));
+
+// Where a colour sits along min→max: its projection onto that line, so a value off the line still lands somewhere sensible.
+const rgbPosition = (d, c) => {
+  let along = 0;
+  let span = 0;
+  for (const k of RGB) {
+    const dk = d.max[k] - d.min[k];
+    along += (c[k] - d.min[k]) * dk;
+    span += dk * dk;
+  }
+  return Math.max(0, Math.min(1, along / span));
+};
+
 // The shape of a panel: everything about its knobs except the values they hold. A host
 // rebuilds the panel only when this changes, so a report that merely carries fresh values
 // leaves the inputs — and a drag in progress — alone.
@@ -84,6 +110,25 @@ function knobRow(d, onChange) {
     input.value = hex6(String(cur));
     input.addEventListener('input', () => onChange(d.key, input.value));
     reset = () => { input.value = hex6(String(d.value)); };
+  } else if (d.type === 'rgb' && rgbRanged(d)) {
+    input = el('input', '', { type: 'range', min: 0, max: 1, step: 0.001 });
+    input.style.setProperty('--sbx-knob-track', `linear-gradient(to right, ${rgbCss(d.min)}, ${rgbCss(d.max)})`);
+    const swatch = el('output', 'sandbox-knob-swatch');
+    const show = (c) => { swatch.style.background = rgbCss(c); swatch.title = rgbHex(c); };
+    const place = (c) => { input.value = String(rgbPosition(d, c)); show(c); };
+    place(cur);
+    input.addEventListener('input', () => {
+      const c = mixRgb(d, Number(input.value));
+      show(c);
+      onChange(d.key, c);
+    });
+    ctl.append(input, swatch);
+    reset = () => place(d.value);
+  } else if (d.type === 'rgb') {
+    input = el('input', '', { type: 'color' });
+    input.value = rgbHex(cur);
+    input.addEventListener('input', () => onChange(d.key, hexRgb(input.value)));
+    reset = () => { input.value = rgbHex(d.value); };
   } else {
     input = el('input', '', { type: 'text' });
     input.value = String(cur);

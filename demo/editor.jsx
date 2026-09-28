@@ -21,7 +21,7 @@ The outline beside the editor is one row per sandbox, names and all.
 const wave = (t, i) => Math.sin(t / 500 + i / 3);
 \`\`\`
 
-\`\`\`sandbox=js viz 460x200 control=auto label="Marching squares"
+\`\`\`sandbox=js viz 460x200 control=autoplay label="Marching squares"
 const gap = knob(32, { min: 20, max: 48 });
 const size = knob(16, { min: 4, max: 32 });
 

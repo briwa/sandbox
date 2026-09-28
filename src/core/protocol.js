@@ -24,3 +24,4 @@ export const MSG_KNOB = '__sbxKnob';
 // The page saying it is listening. A frame that already ran reported to no one, so it sends
 // everything it has reported again: its height, its knobs, and the error it is showing.
 export const MSG_HELLO = '__sbxHello';
+export const MSG_PRESS = '__sbxPress';

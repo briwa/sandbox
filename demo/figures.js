@@ -3,28 +3,14 @@ import './demo.css';
 import { renderMarkdown } from './render.js';
 
 const source = `
-## prose
-
-A figure sits in ordinary markdown. A plain fence in a language the highlighter knows is
-coloured the same way as the code inside a figure, an [external link](https://github.com/briwa/sandbox)
-opens in a new tab, and a [link that would run script](javascript:alert(1)) is left as text.
-
-\`\`\`js
-const easeInOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
-\`\`\`
-
-\`\`\`py
-def ease_in_out(p):
-    return 4 * p ** 3 if p < 0.5 else 1 - (-2 * p + 2) ** 3 / 2
-\`\`\`
-
 ## canvas (+ knobs)
 
-\`\`\`sandbox=js viz 480x260 control=auto code
+\`\`\`sandbox=js viz 480x260 control=autoplay code
 const count = knob(60, { min: 6, max: 120 });
 const radius = knob(70, { min: 20, max: 110 });
 const dot = knob(3, { min: 1, max: 8 });
 const filled = knob(true);
+const tint = knob({ r: 244, g: 96, b: 54 }, { min: { r: 60, g: 130, b: 246 }, max: { r: 244, g: 96, b: 54 } });
 
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
@@ -33,7 +19,7 @@ loop((t) => {
     const r = radius + Math.sin(t / 700 + i / 5) * 26;
     ctx.beginPath();
     ctx.arc(width / 2 + Math.cos(a) * r, height / 2 + Math.sin(a) * r, dot, 0, Math.PI * 2);
-    ctx.fillStyle = ctx.strokeStyle = \`hsl(\${(i * 6 + t / 40) % 360} 70% 55%)\`;
+    ctx.fillStyle = ctx.strokeStyle = \`rgb(\${tint.r} \${tint.g} \${tint.b} / \${0.35 + 0.65 * ((i / count + t / 3000) % 1)})\`;
     filled ? ctx.fill() : ctx.stroke();
   }
 });
@@ -59,7 +45,7 @@ const pingPong = (t, ms) => {
 };
 \`\`\`
 
-\`\`\`sandbox=js viz 480x220 control=auto code
+\`\`\`sandbox=js viz 480x220 control=autoplay code
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = 'currentColor';

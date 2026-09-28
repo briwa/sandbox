@@ -20,8 +20,10 @@ import {
   MSG_ERROR,
   MSG_CONSOLE,
   MSG_KNOBS,
+  MSG_PRESS,
   VIZ_SURFACES,
   CONTROL_MODES,
+  normalizeControl,
   defaultToolbar,
   buildSandboxFence,
   buildSrcdoc,
@@ -76,7 +78,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [bg, setBg] = useState(seed.bg || "");
   const [showCode, setShowCode] = useState(Boolean(seed.showCode));
   const [open, setOpen] = useState(Boolean(seed.open));
-  const [control, setControl] = useState(seed.control || "pausable");
+  const [control, setControl] = useState(normalizeControl(seed.control));
   const [idle, setIdle] = useState(seed.idle || 0);
   const [meta, setMeta] = useState(seed.meta || "");
   const [label, setLabel] = useState(seed.label || "");
@@ -291,6 +293,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     const onMessage = (e) => {
       if (!frameRef.current || frameRef.current.contentWindow !== e.source || !e.data) return;
       if (e.data.__sandboxReset) { setPlaying(false); return; }
+      if (e.data[MSG_PRESS]) { setKnobsOpen(false); setSettingsOpen(false); return; }
       const defs = e.data[MSG_KNOBS];
       if (Array.isArray(defs)) { knobDefsRef.current = defs; setKnobSig(knobsSignature(defs)); return; }
       const out = e.data[MSG_CONSOLE];

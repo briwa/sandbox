@@ -48,8 +48,9 @@ const consoleScript = (on) => (on ? `<script>${CONSOLE_HOOK}</script>` : '');
 // `knob(value, opts)` marks a value the reader can change from the figure's settings panel.
 // `const speed = knob(10)` is keyed by its variable name — the frame is handed the code with
 // that name spliced in, so the call itself stays short. A knob's shape is read off its default
-// (a number, a boolean, a `#hex` colour, a string, or one of `opts.options`) unless `opts.type`
-// says otherwise; `min`/`max` turn a number into a slider, and `label` renames it on the panel.
+// (a number, a boolean, a `#hex` colour, an `{ r, g, b }` colour, a string, or one of `opts.options`)
+// unless `opts.type` says otherwise; `min`/`max` turn a number into a slider — or, given as
+// `{ r, g, b }`, an rgb colour into a slider between them — and `label` renames it on the panel.
 // Changing one re-runs the figure with the new value, keeping its clock and playback state.
 const KNOB_DECL = /\b(const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*knob\s*\(/g;
 export const nameKnobs = (code) => String(code == null ? '' : code).replace(KNOB_DECL, '$1 $2 = __knob("$2",');
@@ -58,16 +59,18 @@ export const nameKnobs = (code) => String(code == null ? '' : code).replace(KNOB
 // across preview rebuilds. A value that no longer fits its knob's type falls back to the default.
 const knobRuntime = (values) =>
   `let __ran=false,__knobVals=${JSON.stringify(values || {})},__knobDefs=[],__knobN=0,__knobSent=false,__rrq=false;` +
-  `const __knobType=(v,o)=>o.type||(typeof v==='boolean'?'boolean':typeof v==='number'?'number':Array.isArray(o.options)?'select':/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)?'color':'string');` +
+  `const __isRgb=c=>c!=null&&typeof c==='object'&&['r','g','b'].every(k=>typeof c[k]==='number');` +
+  `const __knobType=(v,o)=>o.type||(typeof v==='boolean'?'boolean':typeof v==='number'?'number':__isRgb(v)?'rgb':Array.isArray(o.options)?'select':/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)?'color':'string');` +
   `const __knob=(key,value,opts)=>{opts=opts||{};if(key==null)key=opts.label||'knob '+(++__knobN);` +
     `const type=__knobType(value,opts),options=Array.isArray(opts.options)?opts.options.filter(x=>typeof x==='string'||typeof x==='number'):undefined;` +
     `let cur=key in __knobVals?__knobVals[key]:value;` +
-    `if(type==='number'&&typeof cur!=='number'||type==='boolean'&&typeof cur!=='boolean'||type==='select'&&!(options||[]).includes(cur)||(type==='string'||type==='color')&&typeof cur!=='string')cur=value;` +
+    `if(type==='number'&&typeof cur!=='number'||type==='boolean'&&typeof cur!=='boolean'||type==='select'&&!(options||[]).includes(cur)||(type==='string'||type==='color')&&typeof cur!=='string'||type==='rgb'&&!__isRgb(cur))cur=value;` +
     `__knobDefs.push({key,label:String(opts.label||key),type,value,cur,min:opts.min,max:opts.max,step:opts.step,options});return cur};` +
   `const knob=(value,opts)=>__knob(null,value,opts);window.knob=knob;window.__knob=__knob;` +
   `const __knobReport=()=>{if(!__knobDefs.length&&!__knobSent)return;__knobSent=true;parent.postMessage({__sandboxKnobs:__knobDefs},'*')};` +
   `const __rerunSoon=()=>{if(__rrq)return;__rrq=true;requestAnimationFrame(()=>{__rrq=false;__rerun()})};` +
-  `addEventListener('message',e=>{const k=e.data&&e.data.__sbxKnob;if(!k)return;if(k.reset)__knobVals={};else __knobVals[k.key]=k.value;__rerunSoon()});`;
+  `addEventListener('message',e=>{const k=e.data&&e.data.__sbxKnob;if(!k)return;if(k.reset)__knobVals={};else __knobVals[k.key]=k.value;__rerunSoon()});` +
+  `addEventListener('pointerdown',()=>parent.postMessage({__sbxPress:true},'*'),true);`;
 
 // Answers the page's hello with every report the frame has made so far. `report` and the error
 // each builder defines are looked up when the hello comes, so the order they are declared in is free.
@@ -76,7 +79,8 @@ const HELLO =
 
 // Who drives playback. The last two hand that job to the host page: `manual` waits for
 // play/pause/reset messages, `hover` runs only while the host says the pointer is on it.
-export const CONTROL_MODES = ['pausable', 'auto', 'none', 'manual', 'hover'];
+export const CONTROL_MODES = ['default', 'autoplay', 'none', 'manual', 'hover'];
+export const normalizeControl = (c) => (CONTROL_MODES.includes(c) ? c : 'default');
 export { DEFAULT_W, DEFAULT_H };
 
 // The two axes an author actually picks: the language, and whether it is visualized.
@@ -91,7 +95,7 @@ export function specToToolbar(spec = {}) {
     bg: spec.bg || '',
     showCode: Boolean(spec.showCode),
     open: Boolean(spec.open),
-    control: spec.control || 'pausable',
+    control: normalizeControl(spec.control),
     idle: spec.idle || 0,
     meta: spec.meta || '',
     label: spec.componentName || spec.label || '',
@@ -114,7 +118,7 @@ export function defaultToolbar(overrides = {}) {
     bg: '',
     showCode: false,
     open: false,
-    control: 'pausable',
+    control: 'default',
     idle: 0,
     meta: '',
     label: '',
@@ -212,7 +216,7 @@ export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode
   if (bg) tokens.push(`bg=${metaValue(bg)}`);
   if (open) tokens.push('open');
   else if (showCode) tokens.push('code');
-  if (control && control !== 'pausable' && !isVue) tokens.push(`control=${control}`);
+  if (control && control !== 'default' && !isVue) tokens.push(`control=${control}`);
   if (idle && !isVue) tokens.push(`idle=${Math.max(0, Number(idle) || 0)}`);
   if (meta) tokens.push(`meta=${metaValue(meta)}`);
   if (label) tokens.push(`label=${metaValue(label)}`);
@@ -287,8 +291,7 @@ export function parseMeta(lang, meta) {
   if (isVue) return { kind: 'figure', lang: 'vue', preset: 'root', w, h, showCode, open, bg, label, meta: metaText };
 
   const preset = PRESETS.has(values.viz) ? values.viz : 'canvas';
-  let control = values.control || (flags.has('auto') ? 'auto' : 'pausable');
-  if (!CONTROL_MODES.includes(control)) control = 'pausable';
+  const control = normalizeControl(values.control);
   const idle = Math.max(0, Number(values.idle) || 0);
 
   return { kind: 'figure', lang: 'js', preset, w, h, showCode, open, bg, control, idle, label, meta: metaText };
@@ -430,7 +433,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const preludeJson = JSON.stringify(preludeMap).replace(/<\//g, '<\\/');
 
   const isRoot = preset === 'root';
-  const mode = control || 'pausable';
+  const mode = normalizeControl(control);
   const isManual = mode === 'manual';
   const isHover = Boolean(hover) || mode === 'hover';
   const idleT = Math.max(0, Number(idle) || 0);
@@ -444,7 +447,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const leaveIdle = (teardown) =>
     idleT ? `const __leaveIdle=()=>{if(__idle){__idle=false;${teardown}run()}};` : `const __leaveIdle=()=>{};`;
 
-  const pausable = isCanvas && (mode === 'pausable' || mode === 'auto') && !isHover;
+  const canPause = isCanvas && (mode === 'default' || mode === 'autoplay') && !isHover;
   const surface = isCanvas
     ? '<canvas></canvas>'
     : isRoot
@@ -462,12 +465,12 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     .map((u) => `<script src="${u}"></script>`)
     .join('');
 
-  const deferred = (isCanvas || isRoot) && mode === 'pausable' && !isHover;
+  const deferred = (isCanvas || isRoot) && mode === 'default' && !isHover;
   const playBtn = deferred
     ? `<button id="__play" type="button" aria-label="Run figure"><svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true"><polygon points="38,28 38,72 74,50" fill="currentColor"/></svg></button>`
     : '';
 
-  const ctlOverlay = pausable
+  const ctlOverlay = canPause
     ? `<div id="__ctl" hidden><button id="__resume" type="button" aria-label="Resume figure"><svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true"><polygon points="38,28 38,72 74,50" fill="currentColor"/></svg></button><button id="__rst" type="button" aria-label="Reset figure"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button></div>`
     : '';
 
@@ -475,7 +478,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     ? `#__play{position:absolute;inset:0;margin:auto;width:64px;height:64px;border:0;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(20,20,20,.55);transition:background .15s,transform .15s}#__play:hover{background:rgba(20,20,20,.8);transform:scale(1.06)}#__play.on-dark{color:#111;background:rgba(245,245,245,.6)}#__play.on-dark:hover{background:rgba(245,245,245,.85)}`
     : '';
 
-  const ctlCss = pausable
+  const ctlCss = canPause
     ? `#__ctl{position:absolute;inset:0;pointer-events:none}#__ctl[hidden]{display:none}#__ctl button{position:absolute;pointer-events:auto;border:0;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(20,20,20,.55);transition:background .15s,transform .15s}#__ctl button:hover{background:rgba(20,20,20,.8)}#__resume{inset:0;margin:auto;width:64px;height:64px}#__resume:hover{transform:scale(1.06)}#__rst{left:50%;top:50%;transform:translate(-50%,42px);width:34px;height:34px}#__rst:hover{transform:translate(-50%,42px) scale(1.06)}#__ctl.on-dark button{color:#111;background:rgba(245,245,245,.6)}#__ctl.on-dark button:hover{background:rgba(245,245,245,.85)}`
     : '';
 
@@ -503,14 +506,14 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const resettable = !isHover;
   const clearSurface = isCanvas ? 'canvas.width=width' : isRoot ? "root.innerHTML=''" : "svg.innerHTML=''";
   // The loops that keep their own clock, so a re-run can pick up where they were.
-  const timed = pausable || isManual;
+  const timed = canPause || isManual;
 
   const loopDef = isHover
     ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${startT})};`
     : isManual
 
       ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${startT});__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}};return __stop};`
-      : pausable
+      : canPause
 
         ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{if(__stop)__stop();__fn=fn;fn(${startT});return (__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}})};`
         : `const loop=(fn)=>{if(__stop)__stop();let id,live=true,t0=null;const t=(ts)=>{if(t0==null)t0=ts;fn(ts-t0);if(live)id=requestAnimationFrame(t)};id=requestAnimationFrame(t);return (__stop=()=>{live=false;cancelAnimationFrame(id)})};`;
@@ -519,7 +522,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
 
   const resetHome = isManual
     ? `${idleHome}__el=0;__t0=null;__now=0;__fn=null;run()`
-    : pausable
+    : canPause
 
       ? `${idleHome}__el=0;__t0=null;__now=0;__fn=null;__ctl.hidden=true;run();` + (deferred ? `__play.style.display='flex'` : `__resumeFig()`)
       : deferred
@@ -541,7 +544,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     ? `const __rerun=()=>{if(!__ran||window.__sbxDead)return;${timed ? 'const on=__raf!=null;if(on)__el=__now;' : ''}__teardown();${timed ? '__fn=null;' : ''}run();${timed ? 'if(on&&__fn&&__raf==null){__t0=null;__raf=requestAnimationFrame(__tick)}' : ''}};`
     : `const __rerun=()=>{if(!__ran||window.__sbxDead)return;const on=__raf!=null;if(on){cancelAnimationFrame(__raf);__raf=null;__el=__now}__fn=null;${clearSurface};run();if(on&&__fn){__t0=null;__raf=requestAnimationFrame(__tick)}};`;
 
-  const pauseControls = pausable
+  const pauseControls = canPause
     ? `const __ctl=document.getElementById('__ctl');` +
       `const __ctlContrast=()=>{const c=getComputedStyle(document.body).backgroundColor.match(/[\\d.]+/g);__ctl.classList.toggle('on-dark',!!(c&&(c.length<4||+c[3]>0)&&(0.299*c[0]+0.587*c[1]+0.114*c[2])<128))};__ctlContrast();${bg ? '' : `addEventListener('message',function(e){if(e.data&&e.data.__sbxBg)requestAnimationFrame(__ctlContrast)});`}` +
       `const __pause=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now;__ctl.hidden=false}};` +
@@ -555,7 +558,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const playSetup = `const __play=document.getElementById('__play');const __contrast=()=>{const c=getComputedStyle(document.body).backgroundColor.match(/[\\d.]+/g);__play.classList.toggle('on-dark',!!(c&&(c.length<4||+c[3]>0)&&(0.299*c[0]+0.587*c[1]+0.114*c[2])<128))};__contrast();${bg ? '' : `addEventListener('message',function(e){if(e.data&&e.data.__sbxBg)requestAnimationFrame(__contrast)});`}`;
   const tail = deferred
 
-    ? pausable
+    ? canPause
 
       ? playSetup + pauseControls + `__play.addEventListener('click',()=>__resumeFig());start();report();`
       : playSetup + `__play.addEventListener('click',()=>{__play.style.display='none';start()});report();`
@@ -566,7 +569,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
 
         ? `start();addEventListener('message',function(e){if(!__fn||!e.data)return;if(e.data.__figplay){if(__raf==null){__leaveIdle();__t0=null;__raf=requestAnimationFrame(__tick)}}else if('__figplay' in e.data){reset()}});`
 
-        : pauseControls + `start();` + (pausable ? `__resumeFig();` : ``);
+        : pauseControls + `start();` + (canPause ? `__resumeFig();` : ``);
   // Everything the srcdoc puts above the user's code is emitted on one line, so a line
   // number reported from inside the frame maps back to an editor line by subtracting this
   // base. Prelude lines land at zero or below, which the host reads as "thrown in a shared

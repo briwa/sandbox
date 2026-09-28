@@ -20,13 +20,13 @@ const sample = (control, extra = '') =>
 
 const source = `
 
-## pausable (default) - starts off paused
+## default - starts off paused
 
-${sample('pausable')}
+${sample('default')}
 
-## auto - runs on its own
+## autoplay - runs on its own
 
-${sample('auto')}
+${sample('autoplay')}
 
 ## none - uncontrollable
 
@@ -46,7 +46,7 @@ ${sample('manual')}
 
 \`idle=<t in ms>\` parks the figure at a given time, and defines the reset point.
 
-${sample('pausable', 'idle=2000')}
+${sample('default', 'idle=2000')}
 
 ${sample('hover', 'idle=2000')}
 `;
