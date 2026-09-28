@@ -615,6 +615,13 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>${consoleScript(captureConsole)}</head><body>${surface}${playBtn}${ctlOverlay}${ext}<script>${errorReporting}</script><script>${script}</script></body></html>`;
 }
 
+const FENCE_OPEN = /^\s*(`{3,}|~{3,})\s*([^\s]+)?\s*(.*)$/;
+const FENCE_CLOSE = { '`': /^\s*`{3,}\s*$/, '~': /^\s*~{3,}\s*$/ };
+
+// Any line that opens or closes a fence, sandbox or not. An edit that touches none of
+// these, and none of the blocks, cannot change what findSandboxBlocks returns.
+export const FENCE_LINE = /^\s*(?:`{3,}|~{3,})/;
+
 export function findSandboxBlocks(src) {
   const text = src || '';
   const lines = text.split('\n');
@@ -624,22 +631,18 @@ export function findSandboxBlocks(src) {
 
   const blocks = [];
   for (let i = 0; i < lines.length; i++) {
-    const open = /^\s*(`{3,}|~{3,})\s*([^\s]+)?\s*(.*)$/.exec(lines[i]);
+    const open = FENCE_OPEN.exec(lines[i]);
     if (!open) continue;
-    const fence = open[1][0];
+    const close = FENCE_CLOSE[open[1][0]];
     const spec = parseMeta(open[2] || '', open[3] || '');
 
-    const body = [];
     let j = i + 1;
-    for (; j < lines.length; j++) {
-      if (new RegExp(`^\\s*\\${fence}{3,}\\s*$`).test(lines[j])) break;
-      body.push(lines[j]);
-    }
+    while (j < lines.length && !close.test(lines[j])) j++;
     const closed = j < lines.length;
     if (spec) {
       const endLine = closed ? j : lines.length - 1;
       const to = Math.min(text.length, starts[endLine] + lines[endLine].length);
-      blocks.push({ ...spec, code: body.join('\n'), from: starts[i], to, closed });
+      blocks.push({ ...spec, code: lines.slice(i + 1, j).join('\n'), from: starts[i], to, closed });
     }
     i = j;
   }

@@ -50,7 +50,7 @@ const withFallback = (highlight) => async (code, lang = 'js') => {
   }
 };
 
-export function remarkSandbox({ highlight } = {}) {
+export function remarkSandbox({ highlight, lazy = false } = {}) {
   const highlightCode = withFallback(highlight);
 
   return async (tree) => {
@@ -115,7 +115,7 @@ export function remarkSandbox({ highlight } = {}) {
           (spec.control ? ` data-control="${spec.control}"` : '') +
           ` style="--sandbox-h:${spec.h}px;--sandbox-ar:${spec.w}/${spec.h}">` +
 
-          `<div class="sandbox-stage"><iframe class="sandbox-frame" sandbox="allow-scripts" title="interactive ${spec.preset} figure" srcdoc="${srcdoc}"></iframe>` +
+          `<div class="sandbox-stage"><iframe class="sandbox-frame" sandbox="allow-scripts" title="interactive ${spec.preset} figure" ${lazy ? 'data-srcdoc' : 'srcdoc'}="${srcdoc}"></iframe>` +
           // A frame swallows the pointer: neither page sees it enter or leave. This catches
           // it in the host document instead, which is where the hover wiring lives.
           (spec.control === 'hover' ? `<div class="sandbox-hover" aria-hidden="true"></div>` : '') +
@@ -252,8 +252,10 @@ export function rehypeLinks({ safe = true, external = true } = {}) {
 // leftover fences after it, and check links last of all on the hast side. Every host —
 // the demo, the editor, the Astro integration — builds from this, so a fix to one pass
 // lands in all of them.
-export function sandboxMarkdownPlugins({ highlight, fences = true, links = true, languages } = {}) {
-  const remarkPlugins = [remarkStripHtml, [remarkSandbox, { highlight }]];
+// `lazy` defers each figure until it nears the viewport; it needs mountFigures on the
+// page to load them, so it is only for hosts that run the client.
+export function sandboxMarkdownPlugins({ highlight, fences = true, links = true, languages, lazy = false } = {}) {
+  const remarkPlugins = [remarkStripHtml, [remarkSandbox, { highlight, lazy }]];
   if (fences) remarkPlugins.push([remarkHighlightFences, { highlight, languages }]);
   const rehypePlugins = links ? [[rehypeLinks, links === true ? {} : links]] : [];
   return { remarkPlugins, rehypePlugins };

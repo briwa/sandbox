@@ -17,6 +17,14 @@ const stepOf = (d) => {
 
 const fmt = (n) => (Number.isInteger(n) ? String(n) : String(+Number(n).toFixed(3)));
 
+// The widest readout a slider can show, so the value beside it never nudges the track.
+const readoutWidth = (d) => {
+  const nums = [d.min, d.max, d.value, stepOf(d)];
+  const decimals = Math.max(...nums.map((n) => (fmt(n).split('.')[1] || '').length));
+  const digits = Math.max(...[d.min, d.max].map((n) => String(Math.floor(Math.abs(n))).length));
+  return (d.min < 0 ? 1 : 0) + digits + (decimals ? decimals + 1 : 0);
+};
+
 // A colour input only speaks six-digit hex.
 const hex6 = (c) => (/^#[0-9a-f]{3}$/i.test(c) ? '#' + c.slice(1).split('').map((x) => x + x).join('') : c);
 
@@ -94,7 +102,10 @@ function knobRow(d, onChange) {
     input = el('input', '', { type: slider ? 'range' : 'number', min: d.min, max: d.max, step: stepOf(d) });
     input.value = String(cur);
     const out = slider ? el('output') : null;
-    if (out) out.textContent = fmt(cur);
+    if (out) {
+      out.style.minWidth = `${readoutWidth(d)}ch`;
+      out.textContent = fmt(cur);
+    }
     input.addEventListener('input', () => {
       if (input.value === '') return;
       const v = Number(input.value);

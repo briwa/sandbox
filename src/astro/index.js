@@ -42,6 +42,8 @@ export default function sandbox(options = {}) {
     // exact output there too.
     fences = false,
     links = true,
+    // Deferring frames relies on the client to load them, so it follows `client`.
+    lazy = client,
     clientOptions,
   } = options;
 
@@ -50,7 +52,7 @@ export default function sandbox(options = {}) {
     hooks: {
       'astro:config:setup': async ({ config, updateConfig, injectScript }) => {
         if (remark) {
-          const plugins = sandboxMarkdownPlugins({ highlight: shikiHighlight(shiki), fences, links });
+          const plugins = sandboxMarkdownPlugins({ highlight: shikiHighlight(shiki), fences, links, lazy });
           await installPlugins(config, updateConfig, plugins);
         }
 

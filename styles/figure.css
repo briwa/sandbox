@@ -13,6 +13,8 @@
 /* A hover figure fills whatever box the host gives it, so the height it reports back is
    its own box height — circular. Hold the declared proportions instead. */
 .sandbox[data-control='hover'] .sandbox-frame { height: auto; aspect-ratio: var(--sandbox-ar); }
+/* A frame waiting to load holds the shape it will draw at. */
+.sandbox-frame[data-srcdoc] { height: auto; aspect-ratio: var(--sandbox-ar); }
 .sandbox[data-control='hover'] .sandbox-stage { position: relative; }
 .sandbox-hover { position: absolute; inset: 0; }
 

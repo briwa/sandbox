@@ -30,7 +30,8 @@
     "dev": "vite",
     "demo:build": "vite build",
     "demo:preview": "vite preview",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test": "node --test test/*.test.js"
   },
   "publishConfig": {
     "access": "public"

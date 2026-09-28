@@ -73,7 +73,16 @@ export function watchFigureVisibility(frames) {
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) { onScreen.set(e.target, e.isIntersecting); send(e.target); }
   });
-  const sync = () => { for (const f of frames()) { io.observe(f); send(f); } };
+  // Observing is what sends a frame its first state, so each frame is observed once;
+  // re-sending to every frame on every report made page load quadratic in figures.
+  const observed = new WeakSet();
+  const sync = () => {
+    for (const f of frames()) {
+      if (observed.has(f)) continue;
+      observed.add(f);
+      io.observe(f);
+    }
+  };
   const onPage = () => { for (const f of frames()) send(f); };
   document.addEventListener('visibilitychange', onPage);
   window.addEventListener('focus', onPage);
@@ -81,6 +90,7 @@ export function watchFigureVisibility(frames) {
   sync();
   return {
     sync,
+    send,
     stop() {
       io.disconnect();
       document.removeEventListener('visibilitychange', onPage);
@@ -88,6 +98,46 @@ export function watchFigureVisibility(frames) {
       window.removeEventListener('blur', onPage);
     },
   };
+}
+
+const LAZY_FRAME = 'iframe[data-srcdoc]';
+
+// remark's `lazy` leaves a figure's document in `data-srcdoc`, since browsers load a
+// srcdoc frame at once whatever its `loading` says. This hands it over as the frame nears
+// the viewport, so a figure nobody scrolls to never parses or runs. `eager` loads them all.
+export function watchLazyFigures(root = document, { margin = '100% 0px', eager = false } = {}) {
+  const scope = () => (typeof root === 'function' ? root() : root);
+  const load = (f) => {
+    const doc = f.getAttribute('data-srcdoc');
+    if (doc == null) return;
+    // Held at the placeholder's size until the frame reports its own, so nothing below jumps.
+    if (!f.style.height && f.closest('.sandbox')?.dataset.control !== 'hover') f.style.height = f.offsetHeight + 'px';
+    f.removeAttribute('data-srcdoc');
+    f.srcdoc = doc;
+  };
+  const io = eager || typeof IntersectionObserver === 'undefined'
+    ? null
+    : new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        io.unobserve(e.target);
+        load(e.target);
+      }
+    }, { rootMargin: margin });
+  const sync = () => {
+    for (const f of scope()?.querySelectorAll(LAZY_FRAME) ?? []) io ? io.observe(f) : load(f);
+  };
+  let queued = false;
+  const mo = new MutationObserver(() => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => { queued = false; sync(); });
+  });
+  const node = scope();
+  const target = node?.nodeType === 9 ? node.documentElement : node;
+  if (target) mo.observe(target, { childList: true, subtree: true });
+  sync();
+  return { sync, stop() { mo.disconnect(); io?.disconnect(); } };
 }
 
 // The text of line `n` of a highlighted code block as a Range, whatever markup the
@@ -158,12 +208,15 @@ export function mountFigures({
   prime = true,
   hover = true,
   knobs = true,
+  lazy = true,
   onResize,
 } = {}) {
   const scope = () => (typeof root === 'function' ? root() : root);
   const frames = () => scope()?.querySelectorAll(selector) ?? [];
 
+  const lazyFrames = watchLazyFigures(scope, { eager: !lazy });
   const vis = watchFigureVisibility(frames);
+  const reported = new WeakSet();
   const stopTheme = watchFigureTheme(frames);
   const syncHover = hover ? watchFigureHover(scope) : null;
   syncHover?.();
@@ -200,8 +253,14 @@ export function mountFigures({
     for (const f of frames()) {
       if (f.contentWindow !== e.source) continue;
       pushFigureTheme(f.contentWindow);
-      vis.sync();
-      syncHover?.();
+      // A frame's first report is when it can hear its visibility — a lazy one was
+      // observed before its document existed — and when a new figure needs wiring.
+      if (!reported.has(f)) {
+        reported.add(f);
+        vis.sync();
+        syncHover?.();
+        vis.send(f);
+      }
 
       // A hover figure is sized by its host, and the height it reports is just that box
       // measured back — taking it would pin the frame to whatever it happened to start at.
@@ -278,5 +337,6 @@ export function mountFigures({
     clearHit();
     stopTheme();
     vis.stop();
+    lazyFrames.stop();
   };
 }

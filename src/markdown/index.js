@@ -3,7 +3,7 @@
 // site's own processor; this is the same pipeline with unified wrapped around it.
 //
 // `highlight` is the host's highlighter — `highlightCode` from `@briwa.dev/sandbox/editor`
-// is the one that matches the editor's own colouring. `fences`, `links` and `languages`
+// is the one that matches the editor's own colouring. `fences`, `links`, `languages` and `lazy`
 // are passed through to `sandboxMarkdownPlugins`; `remarkPlugins` and `rehypePlugins` are
 // the host's own passes, run after the preset's on each side.
 //

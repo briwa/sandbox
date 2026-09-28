@@ -1,7 +1,7 @@
 import { Decoration, EditorView, WidgetType, ViewPlugin, keymap } from '@codemirror/view';
 import { EditorState, StateField, Prec, Transaction, MapMode } from '@codemirror/state';
 import { autocompletion, completionStatus } from '@codemirror/autocomplete';
-import { describeSandboxBlock, findSandboxBlocks, defaultToolbar } from '../core/index.js';
+import { describeSandboxBlock, findSandboxBlocks, defaultToolbar, FENCE_LINE } from '../core/index.js';
 import { iconSvg, KIND_ICONS } from '../core/icons.js';
 
 function iconChip(name, title) {
@@ -11,6 +11,38 @@ function iconChip(name, title) {
   chip.setAttribute('aria-label', title);
   chip.innerHTML = iconSvg(name, 13);
   return chip;
+}
+
+const touchesFence = (doc, from, to) => {
+  for (let pos = from; ; ) {
+    const line = doc.lineAt(pos);
+    if (FENCE_LINE.test(line.text)) return true;
+    if (line.to >= to) return false;
+    pos = line.to + 1;
+  }
+};
+
+// Typing prose between blocks is by far the most common edit, and it cannot change which
+// blocks there are: only an edit that lands in a block or on a fence line can. Those
+// rescan; everything else keeps the blocks and moves them with the text.
+function nextBlocks(blocks, tr) {
+  let rescan = false;
+  tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+    if (rescan) return;
+    rescan = blocks.some((b) => b.from <= toA && b.to >= fromA)
+      || touchesFence(tr.startState.doc, fromA, toA)
+      || touchesFence(tr.newDoc, fromB, toB);
+  });
+  if (rescan) return { blocks: findSandboxBlocks(tr.newDoc.toString()), rescanned: true };
+  let moved = false;
+  const next = blocks.map((b) => {
+    const from = tr.changes.mapPos(b.from, 1);
+    const to = tr.changes.mapPos(b.to, -1);
+    if (from === b.from && to === b.to) return b;
+    moved = true;
+    return { ...b, from, to };
+  });
+  return { blocks: moved ? next : blocks, rescanned: false };
 }
 
 function removeBlock(view, from, to) {
@@ -40,18 +72,23 @@ function toolBtn(className, label, onClick, icon) {
 export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => window.confirm(m) } = {}) {
   const create = (kind, pos) => onCreate?.(kind, pos, kind === 'external' ? { code: '', label: '' } : defaultToolbar(defaults));
 
-  function blockActions(view, block) {
+  // A widget outlives the edits that move its block, so it looks the block up when pressed
+  // rather than holding on to the positions it was drawn with.
+  function blockActions(view, index) {
+    const current = () => view.state.field(blocksField).blocks[index];
     return [
-      toolBtn('cm-sbx-btn', 'Edit', () => onEdit?.(block), 'pencil'),
+      toolBtn('cm-sbx-btn', 'Edit', () => { const b = current(); if (b) onEdit?.(b); }, 'pencil'),
       toolBtn('cm-sbx-btn danger', 'Remove', () => {
-        if (confirm('Remove this sandbox block?')) removeBlock(view, block.from, block.to);
+        if (!confirm('Remove this sandbox block?')) return;
+        const b = current();
+        if (b) removeBlock(view, b.from, b.to);
       }, 'trash'),
     ];
   }
 
   class SandboxCard extends WidgetType {
     constructor(block, index) { super(); this.block = block; this.index = index; this.name = describeSandboxBlock(block).label; }
-    sig() { const b = this.block; return `${b.from}:${b.to}:${b.lang}:${b.preset}:${b.bg}:${b.showCode}:${b.open}:${b.control}:${b.meta}:${this.name}`; }
+    sig() { const b = this.block; return `${b.lang}:${b.preset}:${b.bg}:${b.showCode}:${b.open}:${b.control}:${b.meta}:${this.name}`; }
     eq(o) { return this.index === o.index && this.sig() === o.sig(); }
     toDOM(view) {
       const b = this.block;
@@ -77,7 +114,7 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
 
       const actions = document.createElement('div');
       actions.className = 'cm-sbx-actions';
-      actions.append(...blockActions(view, this.block));
+      actions.append(...blockActions(view, this.index));
 
       card.append(chips, actions);
       return card;
@@ -87,7 +124,7 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
 
   class LibCard extends WidgetType {
     constructor(block, index, kind, label) { super(); this.block = block; this.index = index; this.kind = kind; this.label = label; }
-    eq(o) { return this.index === o.index && this.kind === o.kind && this.label === o.label && this.block.from === o.block.from && this.block.to === o.block.to; }
+    eq(o) { return this.index === o.index && this.kind === o.kind && this.label === o.label; }
     toDOM(view) {
       const card = document.createElement('div');
       card.className = 'cm-sbx-card';
@@ -104,15 +141,14 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
       for (const [icon, title] of KIND_ICONS[this.kind] ?? KIND_ICONS.source) chips.appendChild(iconChip(icon, title));
       const actions = document.createElement('div');
       actions.className = 'cm-sbx-actions';
-      actions.append(...blockActions(view, this.block));
+      actions.append(...blockActions(view, this.index));
       card.append(chips, actions);
       return card;
     }
     ignoreEvent(e) { return e.type !== 'mousedown'; }
   }
 
-  function buildDecorations(state) {
-    const blocks = findSandboxBlocks(state.doc.toString());
+  function buildDecorations(blocks) {
     const ranges = [];
     blocks.forEach((b, i) => {
 
@@ -124,18 +160,23 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
     return Decoration.set(ranges, true);
   }
 
-  const decorationField = StateField.define({
-    create(state) { return buildDecorations(state); },
-    update(value, tr) {
-      if (tr.docChanged) return buildDecorations(tr.state);
-      return value;
+  const blocksField = StateField.define({
+    create(state) {
+      const blocks = findSandboxBlocks(state.doc.toString());
+      return { blocks, deco: buildDecorations(blocks) };
     },
-    provide: (f) => EditorView.decorations.from(f),
+    update(value, tr) {
+      if (!tr.docChanged) return value;
+      const { blocks, rescanned } = nextBlocks(value.blocks, tr);
+      return { blocks, deco: rescanned ? buildDecorations(blocks) : value.deco.map(tr.changes) };
+    },
+    provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
   });
+  const decorations = (state) => state.field(blocksField).deco;
 
   const blockAt = (state, pos) => {
     let block = null;
-    state.field(decorationField).between(pos, pos, (from, to, deco) => {
+    decorations(state).between(pos, pos, (from, to, deco) => {
       block = { from, to, index: deco.spec.widget.index };
       return false;
     });
@@ -144,7 +185,7 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
 
   const blockBetween = (state, from, to, dir) => {
     let found = null;
-    state.field(decorationField).between(Math.min(from, to), Math.max(from, to), (bFrom, bTo, deco) => {
+    decorations(state).between(Math.min(from, to), Math.max(from, to), (bFrom, bTo, deco) => {
       const hit = dir > 0 ? bFrom >= from && bFrom <= to : bTo <= from && bTo >= to;
       if (!hit) return;
       found = { from: bFrom, to: bTo, index: deco.spec.widget.index };
@@ -277,7 +318,7 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
     if (!tr.docChanged || tr.isUserEvent('undo') || tr.isUserEvent('redo')) return tr;
     const doc = tr.newDoc;
     const broken = [];
-    tr.startState.field(decorationField).between(0, tr.startState.doc.length, (from, to, deco) => {
+    decorations(tr.startState).between(0, tr.startState.doc.length, (from, to, deco) => {
       const nf = tr.changes.mapPos(from, 1, MapMode.TrackDel);
       const nt = tr.changes.mapPos(to, -1, MapMode.TrackDel);
       if (nf == null || nt == null) return;
@@ -367,8 +408,8 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
   });
 
   return [
-    decorationField,
-    EditorView.atomicRanges.of((view) => view.state.field(decorationField)),
+    blocksField,
+    EditorView.atomicRanges.of((view) => decorations(view.state)),
     blockKeymap,
     typeBelow,
     selectOnClick,
