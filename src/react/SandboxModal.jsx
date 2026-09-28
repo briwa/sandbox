@@ -26,7 +26,7 @@ import {
   buildSandboxFence,
   buildSrcdoc,
   buildVueSrcdoc,
-  sandboxPrelude,
+  sandboxPreludeBlocks,
   sandboxExternals,
   sandboxVueComponents,
 } from "../core/index.js";
@@ -45,7 +45,7 @@ function buildPreview({ lang, viz, w, h, bg, idle, knobs }, code, siblings) {
     });
   }
   const spec = { preset: viz, w, h, bg, control: 'manual', idle, console: true, knobs };
-  return buildSrcdoc(spec, code, sandboxPrelude(siblings), sandboxExternals(siblings));
+  return buildSrcdoc(spec, code, sandboxPreludeBlocks(siblings), sandboxExternals(siblings));
 }
 
 // SandboxEditor seeds its state once, so a new target must arrive as a remount, not as new props.
@@ -298,7 +298,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
       const err = e.data[MSG_ERROR];
       if (err) {
         showError(cmRef.current, err);
-        setLogs((prev) => appendConsole(prev, [{ text: String(err.message) }]));
+        setLogs((prev) => appendConsole(prev, [{ text: err.hint ? `${err.hint}\n${err.message}` : String(err.message) }]));
         return;
       }
       const height = e.data.__sandboxHeight;

@@ -3,7 +3,7 @@ import {
   describeSandboxBlock,
   buildSrcdoc,
   buildVueSrcdoc,
-  sandboxPrelude,
+  sandboxPreludeBlocks,
   sandboxExternals,
   sandboxVueComponents,
   safeUrl,
@@ -68,11 +68,16 @@ export function remarkSandbox({ highlight } = {}) {
     const allBlocks = found.map(({ spec, code }) => ({ ...spec, code }));
     const externals = sandboxExternals(allBlocks);
     const components = sandboxVueComponents(allBlocks);
-    const prelude = sandboxPrelude(allBlocks);
+    const prelude = sandboxPreludeBlocks(allBlocks);
+
+    // A frame names a shared js block by its position in the prelude, so the page stamps
+    // each one with the same index for the client to find on a goto.
+    let sourceIndex = 0;
 
     await Promise.all(
       found.map(async ({ parent, index, spec, code }) => {
         const { kind, label } = describeSandboxBlock({ ...spec, code });
+        const source = kind === 'source' ? ` data-source="${sourceIndex++}"` : '';
 
         // A shared block wears the same chrome as a figure: a head stands where the frame
         // would be, and showing the code swaps it out the same way — `data-mode` decides
@@ -82,7 +87,7 @@ export function remarkSandbox({ highlight } = {}) {
           parent.children[index] = {
             type: 'html',
             value:
-              `<figure class="sandbox sandbox-lib" data-kind="${kind}" data-mode="${spec.open ? 'code' : 'preview'}">` +
+              `<figure class="sandbox sandbox-lib" data-kind="${kind}"${source} data-mode="${spec.open ? 'code' : 'preview'}">` +
               libHead(kind, label) +
               `<div class="sandbox-code">${body}</div>` +
               `<div class="sandbox-tools">` +

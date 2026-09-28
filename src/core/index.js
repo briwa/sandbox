@@ -289,12 +289,30 @@ export function parseMeta(lang, meta) {
   return { kind: 'figure', lang: 'js', preset, w, h, showCode, open, bg, control, idle, label, meta: metaText };
 }
 
-export function sandboxPrelude(blocks) {
-  return (blocks || [])
-    .filter((b) => b.kind === 'source' && b.lang === 'js')
-    .map((b) => b.code)
-    .join('\n\n');
+// The shared js blocks in page order, each with the name the page shows it under, so an
+// error thrown inside the prelude can be pinned to a block instead of "somewhere shared".
+export function sandboxPreludeBlocks(blocks) {
+  const shared = (blocks || []).filter((b) => b.kind === 'source' && b.lang === 'js');
+  return shared.map((b, i) => {
+    const { label } = describeSandboxBlock(b);
+    return {
+      label: label === 'shared source' && shared.length > 1 ? `shared source #${i + 1}` : label,
+      code: b.code || '',
+    };
+  });
 }
+
+export function sandboxPrelude(blocks) {
+  return sandboxPreludeBlocks(blocks).map((b) => b.code).join('\n\n');
+}
+
+// Chrome puts `Name: message` on the first line of a stack; Safari's stack is frames only,
+// so the message has to be put back in front or the reader sees nothing but `run@`.
+const FMT_ERR =
+  `const __fmt=(e)=>{if(!e||typeof e!=='object')return String(e);` +
+  `const s=e.stack?String(e.stack):'',m=e.message==null?'':String(e.message);` +
+  `return m&&s.indexOf(m)<0?(e.name||'Error')+': '+m+(s?'\\n'+s:''):s||String(e)};` +
+  `const __esc=(s)=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');`;
 
 export function safeUrl(u) {
   const s = (u || '').trim();
@@ -377,7 +395,8 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
       ? `const __fx=[${fetched.map((u) => JSON.stringify(u)).join(',')}];` +
         `const __loadExt=async()=>{for(const u of __fx){const r=await fetch(u);if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);const s=document.createElement('script');s.textContent=await r.text();document.head.appendChild(s)}};`
       : `const __loadExt=async()=>{};`) +
-    `const __fail=(e)=>{window.__sbxDead=true;const m=String(e&&e.stack||e);document.body.innerHTML='<pre class=err>'+m+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();parent.postMessage({__sandboxError:{message:m}},'*')};` +
+    FMT_ERR +
+    `const __fail=(e)=>{window.__sbxDead=true;const m=__fmt(e);document.body.innerHTML='<pre class=err>'+__esc(m)+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();parent.postMessage({__sandboxError:{message:m}},'*')};` +
     `(async()=>{try{await __loadExt();const __comp=await loadModule('/__main__.vue',opts);let app=null;` +
       `const __mount=async()=>{__knobDefs=[];__knobN=0;app=Vue.createApp(__comp);${regs}app.mount(root);__knobReport()};` +
       `__rerun=async()=>{if(!app||window.__sbxDead)return;try{app.unmount();await __mount()}catch(e){__fail(e)}};` +
@@ -386,8 +405,23 @@ export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components 
   return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>${consoleScript(captureConsole)}</head><body><div id="root"></div>${ext}<script src="${VUE_SRC}"></script><script src="${SFC_LOADER_SRC}"></script><script>${script}</script></body></html>`;
 }
 
+// `prelude` is the array `sandboxPreludeBlocks` gives, or a plain string for callers that
+// pooled the source themselves; the string form loses the per-block names in errors.
 export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: captureConsole, knobs }, code, prelude = '', externals = []) {
   const isCanvas = preset === 'canvas';
+  const preludeBlocks = Array.isArray(prelude)
+    ? prelude
+    : prelude ? [{ label: 'shared source', code: String(prelude) }] : [];
+  const preludeCode = preludeBlocks.map((b) => b.code).join('\n\n');
+  // Where each block sits in the joined prelude, as 1-based line ranges.
+  let preludeAt = 1;
+  const preludeMap = preludeBlocks.map((b) => {
+    const n = b.code.split('\n').length;
+    const row = [b.label, preludeAt, preludeAt + n - 1];
+    preludeAt += n + 1;
+    return row;
+  });
+  const preludeJson = JSON.stringify(preludeMap).replace(/<\//g, '<\\/');
 
   const isRoot = preset === 'root';
   const mode = control || 'pausable';
@@ -399,7 +433,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const startT = idleT ? `__idle?${idleT}:__now` : '__now';
   const idleVar = idleT ? ',__idle=true' : '';
   const body = nameKnobs(code);
-  const pre = nameKnobs(prelude);
+  const pre = nameKnobs(preludeCode);
   const idleHome = idleT ? '__idle=true;' : '';
   const leaveIdle = (teardown) =>
     idleT ? `const __leaveIdle=()=>{if(__idle){__idle=false;${teardown}run()}};` : `const __leaveIdle=()=>{};`;
@@ -451,7 +485,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     ? `html,body{height:100%}canvas,svg{display:block;width:100%;height:100%}`
     : `canvas,svg{display:block;max-width:100%;height:auto;margin-inline:auto}`;
 
-  const css = `html,body{margin:0;overflow:hidden}${bgCss}${rootCss}${media}.err{color:#c0392b;white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;padding:.75rem}${playCss}${ctlCss}`;
+  const css = `html,body{margin:0;overflow:hidden}${bgCss}${rootCss}${media}.err{color:#c0392b;white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;padding:.75rem}.err a{color:inherit;text-decoration:underline}${playCss}${ctlCss}`;
 
   const loadExt = fetched.length
     ? `const __fx=[${fetched.map((u) => JSON.stringify(u)).join(',')}];` +
@@ -533,18 +567,26 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   // source, not in this block".
   const lineBase = 1 + pre.split('\n').length;
 
+  // A prelude line maps back to a block and a line inside it through `__pre`.
   const errorReporting =
     `const report=()=>parent.postMessage({__sandboxHeight:document.body.scrollHeight},'*');` +
-    `const __base=${lineBase};` +
+    `const __base=${lineBase};const __pre=${preludeJson};` +
+    FMT_ERR +
     `const __own=(f)=>!/^(https?|blob):/.test(f||'');` +
     `const __pick=(s)=>{const hits=String(s||'').match(/[^\\s()]+:\\d+:\\d+/g)||[];` +
       `for(const hit of hits){const p=/^(.*):(\\d+):(\\d+)$/.exec(hit);if(!__own(p[1]))continue;return{line:+p[2]-__base,col:+p[3]}}return null};` +
     `const __evLoc=(e)=>e.lineno&&__own(e.filename)?{line:e.lineno-__base,col:e.colno||0}:__pick(e.error&&e.error.stack);` +
-    `const showErr=(m,loc)=>{window.__sbxDead=true;const hint=loc&&loc.line<1?'Thrown in a shared source block.\\n\\n':'';` +
-      `document.body.innerHTML='<pre class=err>'+hint+m+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();` +
-      `parent.postMessage({__sandboxError:{message:String(m),line:loc&&loc.line,col:loc&&loc.col}},'*');report()};` +
-    `addEventListener('error',e=>showErr((e.error&&e.error.stack)||e.message,__evLoc(e)));` +
-    `addEventListener('unhandledrejection',e=>showErr((e.reason&&e.reason.stack)||e.reason,__pick(e.reason&&e.reason.stack)));`;
+    `const __preAt=(loc)=>{if(!loc||!(loc.line<1))return null;const p=loc.line+__base-1;` +
+      `for(let i=0;i<__pre.length;i++){const b=__pre[i];if(p>=b[1]&&p<=b[2])return{source:i,label:b[0],line:p-b[1]+1}}return{}};` +
+    `const __hint=(at)=>!at?'':at.label?'Thrown in shared source "'+at.label+'", line '+at.line+'.':'Thrown in a shared source block.';` +
+    // The block name is a link: the page it lives in scrolls to the block and marks the line.
+    `const __hintHtml=(at)=>!at?'':!at.label?__esc(__hint(at)):'Thrown in <a href="#" data-src="'+at.source+'" data-line="'+at.line+'">'+__esc('shared source "'+at.label+'", line '+at.line)+'</a>.';` +
+    `document.body.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[data-src]');if(!a)return;e.preventDefault();parent.postMessage({__sandboxGoto:{source:+a.dataset.src,line:+a.dataset.line}},'*')});` +
+    `const showErr=(m,loc)=>{window.__sbxDead=true;const at=__preAt(loc),hint=__hint(at);` +
+      `document.body.innerHTML='<pre class=err>'+(at?__hintHtml(at)+'\\n\\n':'')+__esc(m)+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();` +
+      `parent.postMessage({__sandboxError:{message:String(m),line:loc&&loc.line,col:loc&&loc.col,hint}},'*');report()};` +
+    `addEventListener('error',e=>showErr(e.error?__fmt(e.error):e.message,__evLoc(e)));` +
+    `addEventListener('unhandledrejection',e=>showErr(__fmt(e.reason),__pick(e.reason&&e.reason.stack)));`;
 
   const script =
     VIS_GATE +
@@ -556,7 +598,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     rerun +
     `new ResizeObserver(report).observe(document.documentElement);` +
     themeSync +
-    `const run=()=>{__ran=true;__knobDefs=[];__knobN=0;try{\n${pre}\n${body}\n}catch(e){showErr(e&&e.stack||e,__pick(e&&e.stack));return}report();__knobReport()};` +
+    `const run=()=>{__ran=true;__knobDefs=[];__knobN=0;try{\n${pre}\n${body}\n}catch(e){showErr(__fmt(e),__pick(e&&e.stack));return}report();__knobReport()};` +
     loadExt +
     tail;
 

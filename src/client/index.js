@@ -1,4 +1,4 @@
-import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KNOBS } from '../core/protocol.js';
+import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KNOBS, MSG_GOTO } from '../core/protocol.js';
 import { iconSvg } from '../core/icons.js';
 import { attachFigureKnobs, toggleFigureKnobs, closeFigureKnobs, knobMessage, knobResetMessage } from './knobs.js';
 
@@ -90,6 +90,66 @@ export function watchFigureVisibility(frames) {
   };
 }
 
+// The text of line `n` of a highlighted code block as a Range, whatever markup the
+// highlighter wrapped it in: the walk counts newlines across every text node.
+function lineRange(root, n) {
+  if (!root || !(n >= 1)) return null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  let line = 1;
+  let started = false;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.nodeValue;
+    for (let i = 0; i < text.length; i++) {
+      if (!started && line === n) { range.setStart(node, i); started = true; }
+      if (text[i] !== '\n') continue;
+      if (started) { range.setEnd(node, i); return range; }
+      line++;
+    }
+    if (!started && line === n) { range.setStart(node, text.length); started = true; }
+  }
+  if (!started) return null;
+  const last = root.lastChild;
+  if (last) range.setEndAfter(last);
+  return range;
+}
+
+const HIT = 'sandbox-goto';
+const clearHit = () => { if (typeof CSS !== 'undefined' && CSS.highlights) CSS.highlights.delete(HIT); };
+
+// A frame's error names the shared block it came from; this brings that block on screen
+// with its code open and the line marked. Marking uses the CSS Custom Highlight API, so
+// browsers without it still scroll there. The mark clears on the next press anywhere.
+function gotoSource(scope, fromFrame, { source, line }) {
+  const libs = [...(scope?.querySelectorAll(`.sandbox-lib[data-source="${Number(source)}"]`) ?? [])];
+  if (!libs.length) return;
+  // Several documents on one page each count their blocks from zero: take the nearest.
+  const all = [...scope.querySelectorAll('.sandbox')];
+  const fromAt = all.indexOf(fromFrame?.closest('.sandbox'));
+  const away = (el) => (fromAt < 0 ? 0 : Math.abs(all.indexOf(el) - fromAt));
+  const lib = libs.reduce((best, el) => (away(el) < away(best) ? el : best));
+
+  if (lib.getAttribute('data-mode') !== 'code') {
+    lib.setAttribute('data-mode', 'code');
+    const btn = lib.querySelector('.sandbox-toggle');
+    if (btn) setBtn(btn, 'codeOff', 'Hide code');
+  }
+
+  clearHit();
+  const range = lineRange(lib.querySelector('.sandbox-code code, .sandbox-code pre'), line);
+  if (range && typeof CSS !== 'undefined' && CSS.highlights) CSS.highlights.set(HIT, new Highlight(range));
+
+  const box = range?.getClientRects()[0] || range?.getBoundingClientRect();
+  const target = box && box.height ? box : lib.getBoundingClientRect();
+  window.scrollTo({ top: window.scrollY + target.top - window.innerHeight / 2, behavior: 'smooth' });
+}
+
+const setBtn = (btn, icon, label) => {
+  btn.innerHTML = iconSvg(icon);
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+};
+
 export function mountFigures({
   root = document,
   selector = '.sandbox-frame',
@@ -121,6 +181,13 @@ export function mountFigures({
       return;
     }
 
+    const goto = e.data && e.data[MSG_GOTO];
+    if (goto) {
+      const from = [...frames()].find((f) => f.contentWindow === e.source);
+      if (from) gotoSource(scope(), from, goto);
+      return;
+    }
+
     const h = e.data && e.data[MSG_HEIGHT];
     if (typeof h !== 'number') return;
 
@@ -148,12 +215,6 @@ export function mountFigures({
     if (document.readyState === 'complete') primeFigures();
     else window.addEventListener('load', primeFigures);
   }
-
-  const setBtn = (btn, icon, label) => {
-    btn.innerHTML = iconSvg(icon);
-    btn.title = label;
-    btn.setAttribute('aria-label', label);
-  };
 
   const onToggle = (e) => {
     const copyBtn = e.target.closest('.sandbox-copy');
@@ -186,6 +247,7 @@ export function mountFigures({
     else setBtn(btn, showingCode ? 'code' : 'eye', showingCode ? 'Show code' : 'Show preview');
   };
   if (toggle) document.addEventListener('click', onToggle);
+  document.addEventListener('pointerdown', clearHit);
 
   // A panel closes on a press anywhere else, or on Escape. A press on the frame itself never
   // reaches this document, so the panel stays put while the figure is poked at.
@@ -204,6 +266,8 @@ export function mountFigures({
       document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
     }
+    document.removeEventListener('pointerdown', clearHit);
+    clearHit();
     stopTheme();
     vis.stop();
   };

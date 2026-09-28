@@ -4,6 +4,10 @@ export const MSG_RESET_DONE = '__sandboxReset';
 
 export const MSG_ERROR = '__sandboxError';
 
+// A frame asking the page to show a line of a shared source block: `{ source, line }`,
+// where `source` is the block's index among the page's shared js blocks.
+export const MSG_GOTO = '__sandboxGoto';
+
 export const MSG_BG = '__sbxBg';
 
 export const MSG_VISIBLE = '__figvis';

@@ -28,6 +28,8 @@
   min-width: 100%;
   padding-right: 4.6rem;
 }
+/* The line a figure's error pointed at, once the reader followed the link to it. */
+::highlight(sandbox-goto) { background: color-mix(in srgb, var(--sbx-danger) 22%, transparent); }
 .sandbox[data-mode='preview'] .sandbox-code { display: none; }
 .sandbox[data-mode='code'] .sandbox-stage { display: none; }
 .sandbox-tools {

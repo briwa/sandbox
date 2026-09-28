@@ -54,8 +54,28 @@ const errorTooltip = hoverTooltip((view, pos) => {
 
 export const editorErrors = [errorField, errorDecorations, errorGutter, errorTooltip];
 
+// V8 pins a call to an undefined name inside an argument list or array literal to the start
+// of the enclosing expression, so `steps.push(\n  nope(),\n)` reports the `push` line. When
+// the reported line never mentions the name, the first following line that does is the one.
+// Safari and Firefox report the identifier's own line, so the check leaves them alone.
+const UNDEFINED_NAME = /^(?:ReferenceError: )?(?:([\w$]+) is not defined|Can't find variable: ([\w$]+))/m;
+const SNAP_WINDOW = 40;
+
+export function snapErrorLine(doc, line, message) {
+  const m = UNDEFINED_NAME.exec(String(message || ""));
+  const name = m && (m[1] || m[2]);
+  if (!name || !(line >= 1) || line > doc.lines) return line;
+  const word = new RegExp(`(^|[^\\w$])${name.replace(/\$/g, "\\$")}(?![\\w$])`);
+  if (word.test(doc.line(line).text)) return line;
+  for (let n = line + 1; n <= Math.min(doc.lines, line + SNAP_WINDOW); n++) {
+    if (word.test(doc.line(n).text)) return n;
+  }
+  return line;
+}
+
 export function showError(view, { line, message }) {
   if (!view) return;
+  line = snapErrorLine(view.state.doc, line, message);
   const effects = [setErrorEffect.of({ line, message })];
   if (line >= 1 && line <= view.state.doc.lines) {
     effects.push(EditorView.scrollIntoView(view.state.doc.line(line).from, { y: "nearest" }));
