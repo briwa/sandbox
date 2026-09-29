@@ -344,6 +344,17 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
     return [tr, { selection: { anchor: block.from, head: block.to }, sequential: true }];
   });
 
+  // A state that starts with the cursor at a block's edge — a document that opens on a figure
+  // has it at 0 — reached the view without any transaction the filter above could widen. The
+  // view widens it on arrival instead, so the block is what shows as selected, not a caret
+  // blinking beside it.
+  const selectAtStart = ViewPlugin.define((view) => {
+    const sel = view.state.selection;
+    const block = sel.ranges.length === 1 && sel.main.empty ? edgeAt(view.state, sel.main.head) : null;
+    if (block) queueMicrotask(() => view.dispatch({ selection: { anchor: block.from, head: block.to } }));
+    return {};
+  });
+
   const selectedMark = ViewPlugin.fromClass(
     class {
       constructor(view) { this.marked = null; this.sync(view); }
@@ -416,6 +427,7 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
     fenceBreaks,
     fenceGuard,
     selectAtEdge,
+    selectAtStart,
     selectedMark,
     slashComplete,
     slashCommand,

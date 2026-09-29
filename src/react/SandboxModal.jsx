@@ -268,8 +268,16 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   useEffect(() => {
     if (!settingsOpen) return;
     const onDown = (e) => { if (!settingsRef.current?.contains(e.target)) setSettingsOpen(false); };
+    // A press on the preview frame never reaches this document. A running frame reports it as
+    // a press message (handled below); a frame whose script never ran — a syntax error takes
+    // its press listener down with it — can only be caught by the focus moving into it.
+    const onBlur = () => { if (document.activeElement === frameRef.current) setSettingsOpen(false); };
     document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("blur", onBlur);
+    };
   }, [settingsOpen]);
 
   useEffect(() => {
