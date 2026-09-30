@@ -415,10 +415,12 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
       return {
         from: line.from,
         to: ctx.pos,
-        options: SLASH_OPTIONS.map((o) => ({
+        // CodeMirror ranks ties alphabetically; boost keeps the declared order.
+        options: SLASH_OPTIONS.map((o, i) => ({
           label: o.label,
           detail: o.detail,
           type: 'keyword',
+          boost: SLASH_OPTIONS.length - i,
 
           apply: (view) => {
             view.dispatch({ changes: { from: line.from, to: line.to, insert: '' } });
