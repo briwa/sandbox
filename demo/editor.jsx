@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { joinFrontmatter, readKey } from '@briwa.dev/sandbox';
 import { Icon, MarkdownEditor } from '@briwa.dev/sandbox/react';
 
-const START = `Type \`/sandbox\` on an empty line to insert a block, or press the pencil on a card below.
+const START = `Type \`/sandbox\` on an empty line to insert a block, or click a card below to edit it.
 Opening one puts its code here and its figure, settings and console in the sidebar.
 Your edits are kept in this browser; the reset button on the right brings this sample back.
 

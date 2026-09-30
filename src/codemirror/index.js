@@ -74,16 +74,26 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
 
   // A widget outlives the edits that move its block, so it looks the block up when pressed
   // rather than holding on to the positions it was drawn with.
+  const blockOf = (view, index) => view.state.field(blocksField).blocks[index];
+
   function blockActions(view, index) {
-    const current = () => view.state.field(blocksField).blocks[index];
     return [
-      toolBtn('cm-sbx-btn', 'Edit', () => { const b = current(); if (b) onEdit?.(b); }, 'pencil'),
       toolBtn('cm-sbx-btn danger', 'Remove', () => {
         if (!confirm('Remove this sandbox block?')) return;
-        const b = current();
+        const b = blockOf(view, index);
         if (b) removeBlock(view, b.from, b.to);
       }, 'trash'),
     ];
+  }
+
+  // Clicking the card anywhere but its buttons opens it. Listening for the click rather
+  // than the mousedown leaves the mousedown to select the block first.
+  function openOnClick(card, view, index) {
+    card.addEventListener('click', (e) => {
+      if (e.button !== 0 || e.target.closest('button')) return;
+      const b = blockOf(view, index);
+      if (b) onEdit?.(b);
+    });
   }
 
   class SandboxCard extends WidgetType {
@@ -117,6 +127,7 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
       actions.append(...blockActions(view, this.index));
 
       card.append(chips, actions);
+      openOnClick(card, view, this.index);
       return card;
     }
     ignoreEvent(e) { return e.type !== 'mousedown'; }
@@ -143,6 +154,7 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
       actions.className = 'cm-sbx-actions';
       actions.append(...blockActions(view, this.index));
       card.append(chips, actions);
+      openOnClick(card, view, this.index);
       return card;
     }
     ignoreEvent(e) { return e.type !== 'mousedown'; }

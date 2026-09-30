@@ -11,6 +11,14 @@
   border: 1px solid var(--sbx-rule);
   border-radius: 6px;
   background: color-mix(in srgb, var(--sbx-ink) 3%, transparent);
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+/* The card opens on click, but its own buttons do something else, so it only lights up
+   while the pointer is off them. */
+.cm-sbx-card:hover:not(:has(.cm-sbx-btn:hover)) {
+  border-color: color-mix(in srgb, var(--sbx-accent) 55%, var(--sbx-rule));
+  background: color-mix(in srgb, var(--sbx-accent) 7%, transparent);
 }
 .cm-sbx-has-selected .cm-cursorLayer,
 .cm-sbx-has-selected .cm-selectionLayer { visibility: hidden; }
