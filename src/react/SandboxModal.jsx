@@ -20,6 +20,9 @@ import {
   MSG_ERROR,
   MSG_CONSOLE,
   MSG_PLAY,
+  MSG_PAUSE,
+  MSG_RESET,
+  MSG_RESET_DONE,
   MSG_KNOBS,
   MSG_PRESS,
   VIZ_SURFACES,
@@ -38,8 +41,9 @@ const langCompartment = new Compartment();
 
 const langSupport = (name) => (name === "vue" ? vue() : javascript());
 
-// `control` is the block's own playback mode, so the figure plays as it will on the page.
-function buildPreview({ lang, viz, w, h, bg, idle, knobs, control }, code, siblings) {
+// The preview is always `manual`: the editor's own play and reset buttons drive it, whatever
+// `control` the block asks for on the page.
+function buildPreview({ lang, viz, w, h, bg, idle, knobs }, code, siblings) {
   if (lang === "vue") {
     return buildVueSrcdoc({ w, h, bg }, code, {
       externals: sandboxExternals(siblings),
@@ -48,7 +52,7 @@ function buildPreview({ lang, viz, w, h, bg, idle, knobs, control }, code, sibli
       knobs,
     });
   }
-  const spec = { preset: viz, w, h, bg, control, idle, console: true, knobs };
+  const spec = { preset: viz, w, h, bg, control: "manual", idle, console: true, knobs };
   return buildSrcdoc(spec, code, sandboxPreludeBlocks(siblings), sandboxExternals(siblings));
 }
 
@@ -97,6 +101,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
 
   const [frameKey, setFrameKey] = useState(0);
   const [dirty, setDirty] = useState(false);
+  const [playing, setPlaying] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -131,7 +136,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const tags = isFigure ? [[lang, lang], [viz, viz]] : KIND_ICONS[isVue ? "vue" : "source"];
 
   // `clean: false` re-runs the figure without calling the edits saved — for a rebuild that
-  // only changes how the preview plays, not what the block says.
+  // only changes where the preview is drawn, not what the block says.
   function updatePreview({ clean = true } = {}) {
     if (!isFigure) return;
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
@@ -139,7 +144,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     const height = Number(h) || 0;
 
     clearError(cmRef.current);
-    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg(), idle: Number(idle) || 0, knobs: knobValsRef.current, control }, body, siblings));
+    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg(), idle: Number(idle) || 0, knobs: knobValsRef.current }, body, siblings));
     setPreviewW(width || 640);
     setPreviewH(height || 360);
     setFrameKey((k) => k + 1);
@@ -263,16 +268,15 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     return () => { clearTimeout(saveTimer.current); window.removeEventListener("pagehide", flush); };
   }, []);
 
-  useEffect(() => { setLogs([]); knobDefsRef.current = []; setKnobSig(""); }, [frameKey]);
+  useEffect(() => { setPlaying(false); setLogs([]); knobDefsRef.current = []; setKnobSig(""); }, [frameKey]);
 
-  // Picking another `control` is only seen by running it, so it rebuilds the figure — as does
-  // the dock arriving, since there was nowhere to draw it before.
-  const playbackSeenRef = useRef([docked, control]);
+  // The dock arriving rebuilds the figure, since there was nowhere to draw it before.
+  const dockedSeenRef = useRef(docked);
   useEffect(() => {
-    const [wasDocked, wasControl] = playbackSeenRef.current;
-    playbackSeenRef.current = [docked, control];
-    if (docked && (!wasDocked || control !== wasControl)) updatePreview({ clean: false });
-  }, [docked, control]);
+    const was = dockedSeenRef.current;
+    dockedSeenRef.current = docked;
+    if (docked && !was) updatePreview({ clean: false });
+  }, [docked]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -309,6 +313,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   useEffect(() => {
     const onMessage = (e) => {
       if (!frameRef.current || frameRef.current.contentWindow !== e.source || !e.data) return;
+      if (e.data[MSG_RESET_DONE]) { setPlaying(false); return; }
       if (e.data[MSG_PRESS]) { setKnobsOpen(false); setSettingsOpen(false); return; }
       const defs = e.data[MSG_KNOBS];
       if (Array.isArray(defs)) { knobDefsRef.current = defs; setKnobSig(knobsSignature(defs)); return; }
@@ -350,6 +355,19 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     return () => document.removeEventListener("keydown", onKey, true);
   }, [onCancel]);
 
+  function togglePlay() {
+    const win = frameRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage(playing ? { [MSG_PAUSE]: true } : { [MSG_PLAY]: true }, "*");
+    setPlaying(!playing);
+  }
+
+  function resetFrame() {
+    clearError(cmRef.current);
+    setLogs([]);
+    frameRef.current?.contentWindow?.postMessage({ [MSG_RESET]: true }, "*");
+  }
+
   function save() {
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     if (isFigure) {
@@ -383,19 +401,10 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     return true;
   };
 
-  // The figure is drawn in the dock the way the rendered page draws it: its playback controls
-  // are the frame's own, per `control`, and its knobs hang off the same corner button. A `hover`
-  // figure is driven from out here, since the frame never sees the pointer come or go.
-  const isHoverCtl = hasControls && control === "hover";
-  const postFrame = (msg) => frameRef.current?.contentWindow?.postMessage(msg, "*");
+  // The figure is drawn in the dock with its knobs off the corner button, as on the page. Its
+  // playback is the play and reset beside that button, not the frame's own.
   const dockStage = (
-    <div
-      className="sbx-dock-figure"
-      ref={knobsRef}
-      style={{ width: `${previewW}px` }}
-      onPointerEnter={isHoverCtl ? () => postFrame({ [MSG_PLAY]: true }) : undefined}
-      onPointerLeave={isHoverCtl ? () => postFrame({ [MSG_PLAY]: false }) : undefined}
-    >
+    <div className="sbx-dock-figure" ref={knobsRef} style={{ width: `${previewW}px` }}>
       <iframe
         key={frameKey}
         ref={frameRef}
@@ -405,10 +414,19 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
         title="live figure preview"
         srcDoc={srcdoc}
       />
-      {isHoverCtl && <div className="sandbox-hover" aria-hidden="true" />}
-      {knobSig && (
+      {(hasControls || knobSig) && (
         <div className="sandbox-tools">
-          <button
+          {hasControls && (
+            <>
+              <button type="button" className="sandbox-tool-btn" onClick={togglePlay} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
+                <Icon name={playing ? "pause" : "play"} size={15} />
+              </button>
+              <button type="button" className="sandbox-tool-btn" onClick={resetFrame} title="Restart the preview" aria-label="Restart the preview">
+                <Icon name="reset" size={15} />
+              </button>
+            </>
+          )}
+          {knobSig && <button
             type="button"
             className="sandbox-knobs-btn"
             onClick={() => setKnobsOpen((o) => !o)}
@@ -418,7 +436,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
             aria-expanded={knobsOpen}
           >
             <Icon name="settings" size={15} />
-          </button>
+          </button>}
         </div>
       )}
       {knobSig && knobsOpen && <div ref={knobHostRef} />}

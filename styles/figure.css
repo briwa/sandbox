@@ -43,6 +43,7 @@
 }
 .sandbox-toggle,
 .sandbox-copy,
+.sandbox-tool-btn,
 .sandbox-knobs-btn {
   display: inline-flex;
   align-items: center;
@@ -57,6 +58,7 @@
 }
 .sandbox-toggle:hover,
 .sandbox-copy:hover,
+.sandbox-tool-btn:hover,
 .sandbox-knobs-btn:hover,
 .sandbox-knobs-btn[aria-expanded='true'] { color: var(--sbx-ink); }
 .sandbox[data-mode='preview'] .sandbox-copy { display: none; }
