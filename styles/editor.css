@@ -125,9 +125,7 @@
 .sbx-float-sep { align-self: stretch; width: 1px; margin: 0.25rem 0.2rem; background: var(--sbx-rule); }
 .sbx-field { display: flex; flex-direction: column; gap: 0.25rem; }
 .sbx-field > span {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 0.75rem;
   color: var(--sbx-muted);
 }
 .sbx-field input,
@@ -310,12 +308,11 @@
   border: 1px solid var(--sbx-rule);
   border-radius: 10px;
 }
-.sbx-dialog-title { margin: 0; font-size: 1rem; }
+/* An h2, so a host's own heading styles are undone here. */
+.sbx-dialog-title { margin: 0; font-size: 1rem; letter-spacing: normal; text-transform: none; color: var(--sbx-ink); opacity: 1; }
 .sbx-field-block { display: flex; flex-direction: column; gap: 0.3rem; }
 .sbx-field-block > span {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 0.75rem;
   color: var(--sbx-muted);
 }
 .sbx-field-block input[type="text"] { box-sizing: border-box; width: 100%; }
