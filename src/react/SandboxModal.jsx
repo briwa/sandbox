@@ -8,7 +8,7 @@ import { vue } from "@codemirror/lang-vue";
 import Icon from "./Icon.jsx";
 import { KIND_ICONS } from "../core/icons.js";
 import EditorFind from "./EditorFind.jsx";
-import PreviewConsole, { DockConsole, appendConsole } from "./PreviewConsole.jsx";
+import { DockConsole, appendConsole } from "./PreviewConsole.jsx";
 import { codeServices } from "../editor/services.js";
 import { showError, clearError } from "../editor/errors.js";
 import { figureBg } from "../client/index.js";
@@ -16,7 +16,6 @@ import { knobsPanel, knobsSignature, knobMessage, knobResetMessage } from "../cl
 import { codeHighlightStyle } from "../editor/highlight.js";
 import { loadSandboxDraft, saveSandboxDraft, clearSandboxDraft } from "./storage.js";
 import { targetIdentity } from "./target.js";
-import { getCodeFenceSetting, setCodeFenceSetting } from "./storage.js";
 import {
   MSG_ERROR,
   MSG_CONSOLE,
@@ -39,9 +38,8 @@ const langCompartment = new Compartment();
 
 const langSupport = (name) => (name === "vue" ? vue() : javascript());
 
-// `control` is the playback the figure runs with: `manual` beside the code, where the modal's
-// own buttons drive it, or the block's own mode when docked, so it plays as it will on the page.
-function buildPreview({ lang, viz, w, h, bg, idle, knobs, control = "manual" }, code, siblings) {
+// `control` is the block's own playback mode, so the figure plays as it will on the page.
+function buildPreview({ lang, viz, w, h, bg, idle, knobs, control }, code, siblings) {
   if (lang === "vue") {
     return buildVueSrcdoc({ w, h, bg }, code, {
       externals: sandboxExternals(siblings),
@@ -68,9 +66,9 @@ export default function SandboxModal({ targetKey, initial, draftKey, ...rest }) 
 }
 
 // `dock` is `{ preview, settings, console }`, three elements a host lays out elsewhere — a
-// sidebar, say. Given them, the modal is only the code: the settings render there as a table
-// instead of behind the gear, and the figure and its console render there instead of beside
-// the code. The state is still all the modal's; only where the pieces are drawn moves.
+// sidebar, say. The modal is only ever the code: the figure and its console render in the
+// dock, and so do the settings, as a table instead of behind the gear. Without a dock there
+// is no preview. The state is still all the modal's; only where the pieces are drawn moves.
 function SandboxEditor({ variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey, dock }) {
   const isInline = variant === "inline";
   const docked = Boolean(dock?.settings && dock?.preview && dock?.console);
@@ -95,17 +93,12 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [srcdoc, setSrcdoc] = useState("");
   const [previewW, setPreviewW] = useState(seed.w || 640);
   const [previewH, setPreviewH] = useState(seed.h || 360);
-  const [playing, setPlaying] = useState(false);
   const [logs, setLogs] = useState([]);
 
   const [frameKey, setFrameKey] = useState(0);
   const [dirty, setDirty] = useState(false);
 
-  const [split, setSplit] = useState(() => getCodeFenceSetting("splitRatio", 0.5));
-  const [dragging, setDragging] = useState(false);
-
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(() => getCodeFenceSetting("previewOpen", true));
 
   // The knobs the running preview declared. Only their shape is state — a value-only report
   // must not rebuild the panel mid-drag — while the values dialled in live in a ref and are
@@ -118,7 +111,6 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const knobHostRef = useRef(null);
 
   const modalRef = useRef(null);
-  const bodyRef = useRef(null);
   const hostRef = useRef(null);
   const cmRef = useRef(null);
   const frameRef = useRef(null);
@@ -132,13 +124,10 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const isFigure = viz !== "";
   const isVue = lang === "vue";
   const codeLang = isVue ? "vue" : "javascript";
-  // Canvas is the only surface the preview drives: svg draws once, and root and vue are mounted by the code itself.
-  const hasPreviewControls = isFigure && viz === "canvas";
   // Only these two surfaces render playback UI: canvas gets the play button, pause-on-click
   // and the reset overlay, root gets the play button and reset. svg draws once and vue is
   // mounted by its own runtime, so `control` has nothing to act on.
   const hasControls = isFigure && !isVue && (viz === "canvas" || viz === "root");
-  const showPreview = isFigure && previewOpen && !docked;
   const tags = isFigure ? [[lang, lang], [viz, viz]] : KIND_ICONS[isVue ? "vue" : "source"];
 
   // `clean: false` re-runs the figure without calling the edits saved — for a rebuild that
@@ -150,7 +139,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     const height = Number(h) || 0;
 
     clearError(cmRef.current);
-    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg(), idle: Number(idle) || 0, knobs: knobValsRef.current, control: docked ? control : "manual" }, body, siblings));
+    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg(), idle: Number(idle) || 0, knobs: knobValsRef.current, control }, body, siblings));
     setPreviewW(width || 640);
     setPreviewH(height || 360);
     setFrameKey((k) => k + 1);
@@ -274,16 +263,15 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     return () => { clearTimeout(saveTimer.current); window.removeEventListener("pagehide", flush); };
   }, []);
 
-  useEffect(() => { setPlaying(false); setLogs([]); knobDefsRef.current = []; setKnobSig(""); }, [frameKey]);
+  useEffect(() => { setLogs([]); knobDefsRef.current = []; setKnobSig(""); }, [frameKey]);
 
-  // Docked and beside the code, the figure runs under different playback (see buildPreview),
-  // so moving between the two rebuilds it — and docked, so does picking another `control`,
-  // which is only seen by running it.
+  // Picking another `control` is only seen by running it, so it rebuilds the figure — as does
+  // the dock arriving, since there was nowhere to draw it before.
   const playbackSeenRef = useRef([docked, control]);
   useEffect(() => {
     const [wasDocked, wasControl] = playbackSeenRef.current;
     playbackSeenRef.current = [docked, control];
-    if (docked !== wasDocked || (docked && control !== wasControl)) updatePreview({ clean: false });
+    if (docked && (!wasDocked || control !== wasControl)) updatePreview({ clean: false });
   }, [docked, control]);
 
   useEffect(() => {
@@ -321,7 +309,6 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   useEffect(() => {
     const onMessage = (e) => {
       if (!frameRef.current || frameRef.current.contentWindow !== e.source || !e.data) return;
-      if (e.data.__sandboxReset) { setPlaying(false); return; }
       if (e.data[MSG_PRESS]) { setKnobsOpen(false); setSettingsOpen(false); return; }
       const defs = e.data[MSG_KNOBS];
       if (Array.isArray(defs)) { knobDefsRef.current = defs; setKnobSig(knobsSignature(defs)); return; }
@@ -363,44 +350,6 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     return () => document.removeEventListener("keydown", onKey, true);
   }, [onCancel]);
 
-  function togglePlay() {
-    const win = frameRef.current?.contentWindow;
-    if (!win) return;
-    win.postMessage(playing ? { __figpause: true } : { __figplay: true }, "*");
-    setPlaying(!playing);
-  }
-
-  function togglePreview() {
-    setPreviewOpen(!previewOpen);
-    setCodeFenceSetting("previewOpen", !previewOpen);
-  }
-
-  function resetFrame() {
-    clearError(cmRef.current);
-    setLogs([]);
-    frameRef.current?.contentWindow?.postMessage({ __figreset: true }, "*");
-  }
-
-  function startResize(e) {
-    e.preventDefault();
-    setDragging(true);
-    let ratio = split;
-    const move = (ev) => {
-      const rect = bodyRef.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0) return;
-      ratio = Math.min(0.85, Math.max(0.15, (ev.clientX - rect.left) / rect.width));
-      setSplit(ratio);
-    };
-    const up = () => {
-      setDragging(false);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      setCodeFenceSetting("splitRatio", ratio);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  }
-
   function save() {
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     if (isFigure) {
@@ -434,49 +383,8 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     return true;
   };
 
-  const stage = (
-    <>
-      <div className="sbx-frame-wrap" ref={knobsRef} style={{ width: `${previewW}px` }}>
-        <iframe
-          key={frameKey}
-          ref={frameRef}
-          className="sbx-frame"
-          style={{ aspectRatio: `${previewW} / ${previewH}` }}
-          sandbox="allow-scripts"
-          title="live figure preview"
-          srcDoc={srcdoc}
-        />
-        {knobSig && (
-          <button
-            className="sbx-knobs-btn"
-            onClick={() => setKnobsOpen((o) => !o)}
-            title="Settings"
-            aria-label="Figure settings"
-            aria-haspopup="true"
-            aria-expanded={knobsOpen}
-          >
-            <Icon name="settings" size={14} />
-          </button>
-        )}
-        {knobSig && knobsOpen && <div ref={knobHostRef} />}
-      </div>
-      {hasPreviewControls && (
-        <div className="sbx-controls" role="toolbar" aria-label="Preview controls">
-          <button className="sbx-ctl sbx-icon" onClick={togglePlay} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
-            <Icon name={playing ? "pause" : "play"} size={16} />
-          </button>
-          <button className="sbx-ctl sbx-icon" onClick={resetFrame} title="Restart the preview" aria-label="Restart the preview">
-            <Icon name="reset" size={16} />
-          </button>
-        </div>
-      )}
-    </>
-  );
-
-  const consolePane = <PreviewConsole logs={logs} onClear={() => setLogs([])} />;
-
-  // Docked, the figure is drawn the way the rendered page draws it: its playback controls are
-  // the frame's own, per `control`, and its knobs hang off the same corner button. A `hover`
+  // The figure is drawn in the dock the way the rendered page draws it: its playback controls
+  // are the frame's own, per `control`, and its knobs hang off the same corner button. A `hover`
   // figure is driven from out here, since the frame never sees the pointer come or go.
   const isHoverCtl = hasControls && control === "hover";
   const postFrame = (msg) => frameRef.current?.contentWindow?.postMessage(msg, "*");
@@ -656,26 +564,11 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
           )}
         </div>}
         {!docked && <span className="sbx-float-sep" aria-hidden="true" />}
-        {isFigure && !docked && (
-          <button
-            className={`sbx-float-btn ${previewOpen ? "is-on" : ""}`}
-            onClick={togglePreview}
-            title={previewOpen ? "Hide preview" : "Show preview"}
-            aria-label="Preview"
-            aria-pressed={previewOpen}
-          >
-            <Icon name={previewOpen ? "eye" : "eyeOff"} size={15} />
-          </button>
-        )}
         <button className="sbx-float-btn" onClick={requestClose} title="Close" aria-label="Close">
           <Icon name="close" size={15} />
         </button>
       </div>
-      <div
-        ref={bodyRef}
-        className={`sbx-body ${showPreview ? "" : "sbx-body-solo"} ${dragging ? "sbx-dragging" : ""}`}
-        style={showPreview ? { "--sbx-code-grow": split, "--sbx-prev-grow": 1 - split } : undefined}
-      >
+      <div className="sbx-body sbx-body-solo">
         <div className="sbx-code-pane">
           <div className="sbx-code" ref={hostRef} />
           <div className="sbx-tags" aria-label="Editing">
@@ -691,21 +584,6 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
               answer the same keystroke. */}
           <EditorFind viewRef={cmRef} scopeRef={modalRef} />
         </div>
-        {showPreview && (
-          <div
-            className="sbx-divider"
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize editor and preview"
-            onPointerDown={startResize}
-          />
-        )}
-        {isFigure && !docked && (
-          <div className="sbx-preview" hidden={!previewOpen}>
-            <div className="sbx-preview-stage">{stage}</div>
-            {consolePane}
-          </div>
-        )}
       </div>
       {docked && createPortal(settingsTable, dock.settings)}
       {docked && isFigure && createPortal(<div className="sbx-dock-preview">{dockStage}</div>, dock.preview)}

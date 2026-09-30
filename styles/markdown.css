@@ -15,6 +15,9 @@
    controls measure from it, so opening the sidebar moves them along with the text. */
 .sbx-md-main {
   position: relative;
+  /* Keeps the inset block modal's z-index in here, so it cannot cover the folded sidebar's
+     tab, which hangs over this column's edge. */
+  isolation: isolate;
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -130,6 +133,8 @@
 }
 /* Folded: nothing but the tab, which hangs past the column's edge. */
 .sbx-md-side.is-collapsed { width: 0; border-left: 0; }
+/* Still mounted — an open block's modal is docked in the slots — just not drawn. */
+.sbx-md-side.is-collapsed > :not(.sbx-md-side-tab) { display: none; }
 
 /* Hung off the edge of the folded column, halfway down. Well under the modal's 1000: the
    modal is inset into the writing column beside this. */

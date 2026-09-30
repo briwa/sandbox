@@ -61,41 +61,39 @@ export default function MarkdownSidebar({ storageKey, frontmatter, onFrontmatter
         </button>
       )}
 
-      {!collapsed && (
-        <>
-          <Resizer width={width} onWidth={setWidth} onCollapse={() => setCollapsed(true)} />
+      {/* Folded, everything below is hidden by CSS rather than unmounted: an open block's
+          modal renders into these slots, and losing them would make it fall back to drawing
+          its own preview, settings and console beside the code. */}
+      <Resizer width={width} onWidth={setWidth} onCollapse={() => setCollapsed(true)} />
 
-          {/* Above the scrolling sections rather than among them, so it stays in view when
-              the console opens over everything else. Kept mounted while folded: the
-              modal's figure is running in there. */}
-          <Section id="preview" title="Preview" open={open.preview} onToggle={toggle} slotRef={slot.preview} />
+      {/* Above the scrolling sections rather than among them, so it stays in view when the
+          console opens over everything else. */}
+      <Section id="preview" title="Preview" open={open.preview} onToggle={toggle} slotRef={slot.preview} />
 
-          <div className="sbx-md-side-body">
-            <Section id="settings" title="Settings" open={open.settings} onToggle={toggle} slotRef={slot.settings} />
+      <div className="sbx-md-side-body">
+        <Section id="settings" title="Settings" open={open.settings} onToggle={toggle} slotRef={slot.settings} />
 
-            {/* The document's, not the block's — out of the way while a block is open. */}
-            {hasFrontmatter && !editing && (
-              <Section id="frontmatter" title="Frontmatter" badge={keyCount || null} open={open.frontmatter} onToggle={toggle}>
-                <FrontmatterTable frontmatter={frontmatter} onChange={(v) => onFrontmatter?.(v)} />
-              </Section>
-            )}
+        {/* The document's, not the block's — out of the way while a block is open. */}
+        {hasFrontmatter && !editing && (
+          <Section id="frontmatter" title="Frontmatter" badge={keyCount || null} open={open.frontmatter} onToggle={toggle}>
+            <FrontmatterTable frontmatter={frontmatter} onChange={(v) => onFrontmatter?.(v)} />
+          </Section>
+        )}
 
-            {blocks.length > 0 && (
-              <Section id="sandboxes" title="Sandboxes" badge={blocks.length} open={open.sandboxes} onToggle={toggle}>
-                <ul className="sbx-md-rows">
-                  {/* Keyed by position: two blocks can be textually identical, and keying by
-                      offset remounted every row below the caret on each keystroke. */}
-                  {blocks.map((block, i) => (
-                    <SandboxRow key={i} block={block} index={i} active={i === active} onOpen={onOpen} onClose={onClose} />
-                  ))}
-                </ul>
-              </Section>
-            )}
-          </div>
+        {blocks.length > 0 && (
+          <Section id="sandboxes" title="Sandboxes" badge={blocks.length} open={open.sandboxes} onToggle={toggle}>
+            <ul className="sbx-md-rows">
+              {/* Keyed by position: two blocks can be textually identical, and keying by
+                  offset remounted every row below the caret on each keystroke. */}
+              {blocks.map((block, i) => (
+                <SandboxRow key={i} block={block} index={i} active={i === active} onOpen={onOpen} onClose={onClose} />
+              ))}
+            </ul>
+          </Section>
+        )}
+      </div>
 
-          <div className="sbx-md-console" ref={slot.console} />
-        </>
-      )}
+      <div className="sbx-md-console" ref={slot.console} />
     </aside>
   );
 }

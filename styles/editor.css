@@ -192,26 +192,11 @@
 .sbx-body { flex: 1; display: flex; min-height: 0; }
 .sbx-code-pane {
   position: relative;
-  flex: var(--sbx-code-grow, 1) 1 0;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
 }
-.sbx-divider {
-  flex: 0 0 7px;
-  position: relative;
-  cursor: col-resize;
-  touch-action: none;
-}
-.sbx-divider::before {
-  content: "";
-  position: absolute;
-  inset: 0 3px;
-  background: var(--sbx-rule);
-  transition: background 0.12s;
-}
-.sbx-divider:hover::before { background: var(--sbx-ink); }
-.sbx-dragging { cursor: col-resize; user-select: none; }
-.sbx-dragging .sbx-divider::before { background: var(--sbx-accent); }
+.sbx-dragging { user-select: none; }
 .sbx-dragging iframe { pointer-events: none; }
 .sbx-code {
   flex: 1;
@@ -282,26 +267,6 @@
 .cm-find-match { background: color-mix(in srgb, var(--sbx-accent) 22%, transparent); border-radius: 2px; }
 .cm-find-current { background: color-mix(in srgb, var(--sbx-accent) 55%, transparent); }
 
-.sbx-preview {
-  flex: var(--sbx-prev-grow, 1) 1 0;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: color-mix(in srgb, var(--sbx-ink) 2%, transparent);
-}
-.sbx-preview[hidden] { display: none; }
-.sbx-preview-stage {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow: auto;
-  padding: 4rem 1rem 1rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-.sbx-controls { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 .sbx-ctl {
   font: inherit;
   font-size: 0.78rem;
@@ -315,7 +280,6 @@
 .sbx-ctl:hover { border-color: var(--sbx-ink); }
 .sbx-ctl.primary { color: var(--sbx-accent); border-color: var(--sbx-accent); }
 .sbx-ctl.sbx-icon { display: inline-flex; align-items: center; justify-content: center; padding: 0.35rem; }
-.sbx-frame-wrap { position: relative; flex: none; max-width: 100%; }
 .sbx-frame {
   display: block;
   width: 100%;
@@ -324,46 +288,6 @@
   outline-offset: -1px;
   border-radius: 6px;
   background: var(--sbx-surface);
-}
-/* The figure's own settings, in the frame's corner — the knobs panel hangs off the wrap. */
-.sbx-knobs-btn {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.3rem;
-  line-height: 1;
-  color: var(--sbx-muted);
-  background: var(--sbx-surface);
-  border: 1px solid var(--sbx-rule);
-  border-radius: 4px;
-  cursor: pointer;
-}
-.sbx-knobs-btn:hover,
-.sbx-knobs-btn[aria-expanded='true'] { color: var(--sbx-ink); }
-/* Fixed, the panel is the viewport, so the viewport is what to measure — and
-   this rule must say so, or it stacks an inset panel that has plenty of room
-   just because the window around it is small. */
-@media (max-width: 56rem) {
-  .sbx-modal:not(.is-inline) .sbx-body { flex-direction: column; }
-  .sbx-modal:not(.is-inline) .sbx-code-pane,
-  .sbx-modal:not(.is-inline) .sbx-preview { flex: 1 1 0; }
-  .sbx-modal:not(.is-inline) .sbx-code-pane { border-bottom: 1px solid var(--sbx-rule); }
-  .sbx-modal:not(.is-inline) .sbx-divider { display: none; }
-  .sbx-modal:not(.is-inline) .sbx-code-pane .editor-find { top: 3rem; }
-}
-/* Inline, the panel is narrower than the window by definition, so sharing the
-   viewport's breakpoint stacked it at window widths where it still fit side by
-   side. It stacks on its own width, and only once a split leaves each pane too
-   narrow to work in. */
-@container sbx-modal (max-width: 44rem) {
-  .sbx-body { flex-direction: column; }
-  .sbx-code-pane, .sbx-preview { flex: 1 1 0; }
-  .sbx-code-pane { border-bottom: 1px solid var(--sbx-rule); }
-  .sbx-divider { display: none; }
-  .sbx-code-pane .editor-find { top: 3rem; }
 }
 
 .sbx-overlay {
