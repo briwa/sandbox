@@ -2,7 +2,7 @@ import { Decoration, EditorView, WidgetType, ViewPlugin, keymap } from '@codemir
 import { EditorState, StateField, Prec, Transaction, MapMode } from '@codemirror/state';
 import { autocompletion, completionStatus } from '@codemirror/autocomplete';
 import { describeSandboxBlock, findSandboxBlocks, defaultToolbar, FENCE_LINE } from '../core/index.js';
-import { iconSvg, KIND_ICONS } from '../core/icons.js';
+import { blockIcons, iconSvg } from '../core/icons.js';
 
 function iconChip(name, title) {
   const chip = document.createElement('span');
@@ -66,7 +66,7 @@ function toolBtn(className, label, onClick, icon) {
   return btn;
 }
 
-// `defaults` seeds every block `/sandbox` opens — `{ viz: 'canvas', w: 800, h: 400 }` starts
+// `defaults` seeds every block `/snippet` opens — `{ viz: 'canvas', w: 800, h: 400 }` starts
 // each new one on a canvas of that size. It reaches `onCreate` filled out as its third
 // argument, ready to hand to the editor as `initial`.
 export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => window.confirm(m) } = {}) {
@@ -113,8 +113,7 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
       label.textContent = this.name;
       label.title = this.name;
       chips.appendChild(label);
-      chips.appendChild(iconChip(b.lang, b.lang));
-      chips.appendChild(iconChip(b.preset, b.preset));
+      for (const [icon, title] of blockIcons('figure', b)) chips.appendChild(iconChip(icon, title));
       if (b.bg) {
         const c = document.createElement('span');
         c.className = 'cm-sbx-chip';
@@ -149,7 +148,7 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
         lbl.title = this.label;
         chips.appendChild(lbl);
       }
-      for (const [icon, title] of KIND_ICONS[this.kind] ?? KIND_ICONS.source) chips.appendChild(iconChip(icon, title));
+      for (const [icon, title] of blockIcons(this.kind, this.block)) chips.appendChild(iconChip(icon, title));
       const actions = document.createElement('div');
       actions.className = 'cm-sbx-actions';
       actions.append(...blockActions(view, this.index));
@@ -386,9 +385,9 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
     }
   );
 
-  // Two commands is the whole surface: `/sandbox` opens as a shared source block, and
-  // language and viz are picked in the modal.
-  const COMMANDS = { '/sandbox': 'figure', '/sandbox-external': 'external' };
+  // Two commands is the whole surface: `/snippet` opens as a shared source block, and
+  // language and viz are picked in the modal; `/lib` pulls in an external library.
+  const COMMANDS = { '/snippet': 'figure', '/lib': 'external' };
   const slashCommand = Prec.high(keymap.of([{
     key: 'Enter',
     run(view) {
@@ -404,8 +403,8 @@ export function sandboxPreview({ onEdit, onCreate, defaults, confirm = (m) => wi
   }]));
 
   const SLASH_OPTIONS = [
-    { label: '/sandbox', kind: 'figure', detail: 'shared source or figure' },
-    { label: '/sandbox-external', kind: 'external', detail: 'external library' },
+    { label: '/snippet', kind: 'figure', detail: 'shared source or figure' },
+    { label: '/lib', kind: 'external', detail: 'external library' },
   ];
   const slashComplete = autocompletion({
     override: [(ctx) => {

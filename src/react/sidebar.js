@@ -11,7 +11,7 @@ export const DEFAULT_W = 340;
 
 // Every collapsible section. A section added after the state was written defaults to open
 // rather than to missing-and-therefore-collapsed.
-const ALL_OPEN = { preview: true, settings: true, frontmatter: true, sandboxes: true };
+const ALL_OPEN = { preview: true, settings: true, frontmatter: true, snippets: true };
 
 export function clampWidth(px) {
   return Math.min(MAX_W, Math.max(MIN_W, Math.round(px)));

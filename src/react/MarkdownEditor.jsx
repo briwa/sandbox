@@ -26,7 +26,7 @@ import { readKey, writeKey } from "../core/frontmatter.js";
 //                                   there is no frontmatter section and no title field
 //   onChange(doc)                   the body, once typing pauses for `changeDelay` ms
 //   preview                         show the rendered document in place of the editor
-//   defaults                        what `/sandbox` opens with, e.g. `{ w: 480, h: 480 }`
+//   defaults                        what `/snippet` opens with, e.g. `{ w: 480, h: 480 }`
 //   draftKey                        scopes the modals' unsaved drafts, e.g. the document's id
 //   codeLanguages                   highlighting for ordinary fences (@codemirror/language-data)
 //   sidebarKey                      where the sidebar's width and folds are remembered

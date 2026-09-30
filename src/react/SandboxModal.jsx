@@ -78,7 +78,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   const [seed] = useState(() => restored ?? defaultToolbar(initial));
 
   const [lang, setLang] = useState(seed.lang === "vue" ? "vue" : "js");
-  // `/sandbox` opens as a shared source block; visualizing is opted into in the settings.
+  // `/snippet` opens as a shared source block; visualizing is opted into in the settings.
   const [viz, setViz] = useState(seed.viz ?? "");
   const [w, setW] = useState(seed.w || 640);
   const [h, setH] = useState(seed.h || 360);

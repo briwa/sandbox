@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { joinFrontmatter, readKey } from '@briwa.dev/sandbox';
 import { Icon, MarkdownEditor } from '@briwa.dev/sandbox/react';
 
-const START = `Type \`/sandbox\` on an empty line to insert a block, or click a card below to edit it.
+const START = `Type \`/snippet\` on an empty line to insert a block (or \`/lib\` for an external library), or click a card below to edit it.
 Opening one puts its code here and its figure, settings and console in the sidebar.
 Your edits are kept in this browser; the reset button on the right brings this sample back.
 
@@ -116,7 +116,7 @@ function Editor() {
       frontmatter={frontmatter}
       onFrontmatterChange={setFrontmatter}
       preview={preview}
-      // What `/sandbox` opens with; viz stays off until it is turned on in Settings.
+      // What `/snippet` opens with; viz stays off until it is turned on in Settings.
       defaults={{ w: 480, h: 240 }}
       draftKey="demo"
       sidebarKey="demo-sidebar"

@@ -321,10 +321,7 @@
 }
 .sbx-md-sect-toggle:hover { background: var(--sbx-hover); }
 .sbx-md-sect-title {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: 0.8rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -403,18 +400,18 @@
 }
 .sbx-md-row-close svg { width: 14px; height: 14px; }
 .sbx-md-row-close:hover { background: var(--sbx-hover); color: var(--sbx-ink); }
-/* Figures solid, the shared pieces hollow: one is a thing on the page, the others are things
-   it is built from. */
-.sbx-md-kind { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--sbx-accent); }
-.sbx-md-kind-source,
-.sbx-md-kind-external,
-.sbx-md-kind-vue { background: none; border: 1.5px solid var(--sbx-muted); }
-.sbx-md-row-text { min-width: 0; display: flex; flex-direction: column; }
-.sbx-md-row-label,
-.sbx-md-row-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sbx-md-row-label { font-size: 0.82rem; color: var(--sbx-ink); }
-.sbx-md-row-detail { font-size: 0.72rem; color: var(--sbx-muted); }
-.sbx-md-row-warn { flex: none; margin-left: auto; font-weight: 700; color: var(--sbx-warn); }
+.sbx-md-row-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--sbx-ink);
+}
+.sbx-md-row-tags { flex: none; display: flex; gap: 0.25rem; opacity: 0.7; }
+.sbx-md-rows li.is-active .sbx-md-row-tags { opacity: 1; }
+.sbx-md-row-warn { flex: none; font-weight: 700; color: var(--sbx-warn); }
 
 @media (pointer: coarse) {
   /* 16px, or iOS zooms the page into the field. */

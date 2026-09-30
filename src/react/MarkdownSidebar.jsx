@@ -1,7 +1,9 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { describeSandboxBlock } from "../core/index.js";
 import { countKeys } from "../core/frontmatter.js";
+import { blockIcons } from "../core/icons.js";
 import FrontmatterTable from "./FrontmatterTable.jsx";
+import Icon from "./Icon.jsx";
 import { clampWidth, DEFAULT_W, loadSidebar, MAX_W, MIN_W, saveSidebar } from "./sidebar.js";
 
 // A MarkdownEditor's right-hand column, top to bottom:
@@ -11,9 +13,9 @@ import { clampWidth, DEFAULT_W, loadSidebar, MAX_W, MIN_W, saveSidebar } from ".
 //   Console      pinned at the foot; open, it takes         │ hidden — while writing prose
 //                everything below the preview               ┘
 //   Frontmatter  the document's, as a table — hidden while a block is open
-//   Sandboxes    one row per block, when there are any
+//   Snippets     one row per block, when there are any
 //
-// Settings, Frontmatter and Sandboxes scroll together between the preview and the console.
+// Settings, Frontmatter and Snippets scroll together between the preview and the console.
 //
 // How wide it is, what is folded, and whether the column is there at all are the writer's,
 // and outlive the session under `storageKey`. No chrome of its own: folding it away is the
@@ -81,7 +83,7 @@ export default function MarkdownSidebar({ storageKey, frontmatter, onFrontmatter
         )}
 
         {blocks.length > 0 && (
-          <Section id="sandboxes" title="Sandboxes" badge={blocks.length} open={open.sandboxes} onToggle={toggle}>
+          <Section id="snippets" title="Snippets" badge={blocks.length} open={open.snippets} onToggle={toggle}>
             <ul className="sbx-md-rows">
               {/* Keyed by position: two blocks can be textually identical, and keying by
                   offset remounted every row below the caret on each keystroke. */}
@@ -115,10 +117,14 @@ const SandboxRow = memo(function SandboxRow({ block, index, active, onOpen, onCl
   return (
     <li className={active ? "is-active" : undefined}>
       <button className="sbx-md-row" onClick={() => onOpen(index)} title={detail || label} aria-current={active || undefined}>
-        <span className={`sbx-md-kind sbx-md-kind-${kind}`} aria-hidden="true" />
-        <span className="sbx-md-row-text">
-          <span className="sbx-md-row-label">{label}</span>
-          {detail && <span className="sbx-md-row-detail">{detail}</span>}
+        <span className="sbx-md-row-label">{label}</span>
+        {/* The same tags as the block's card in the editor and the open modal's corner. */}
+        <span className="sbx-md-row-tags">
+          {blockIcons(kind, block).map(([icon, title]) => (
+            <span key={icon} className="cm-sbx-chip icon" title={title} aria-label={title}>
+              <Icon name={icon} size={12} />
+            </span>
+          ))}
         </span>
         {!block.closed && (
           <span className="sbx-md-row-warn" title="This fence is never closed">!</span>

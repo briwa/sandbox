@@ -31,6 +31,11 @@ export const KIND_ICONS = {
   external: [['globe', 'external library']],
 };
 
+// A block's icon tags as `[icon, title]` pairs, by its `describeSandboxBlock` kind: a figure's
+// language and surface, or its kind's fixed pair.
+export const blockIcons = (kind, block) =>
+  kind === 'figure' ? [[block.lang, block.lang], [block.preset, block.preset]] : KIND_ICONS[kind] ?? KIND_ICONS.source;
+
 export const iconSvg = (name, size = 15) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
   `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">` +
