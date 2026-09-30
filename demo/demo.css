@@ -8,19 +8,20 @@
 
 body {
   margin: 0;
-  padding: 2rem;
 }
 
-body > * + * {
-  margin-top: 1rem;
+/* One bar across the top, identical on every tab — the title on the left, the tabs on the
+   right — so switching tabs never moves it. */
+.demo-header {
+  height: 2.6rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-inline: 1rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
 }
-
-/* The header keeps the reading measure on every tab, so switching tabs never moves it. */
-body > :not(.panel) {
-  max-width: var(--measure);
-  margin-inline: auto;
-}
-
 
 nav {
   display: flex;
@@ -39,7 +40,7 @@ nav [aria-current='page'] {
 }
 
 h1 {
-  font-size: 1.15rem;
+  font-size: 0.9rem;
   margin: 0;
 }
 
@@ -50,12 +51,8 @@ h1 {
   gap: 1rem;
   align-items: stretch;
   max-width: var(--measure);
-  margin-inline: auto;
-}
-
-/* The editor tab needs room for its own layout; it stays centred on the same axis. */
-#panel-editor {
-  max-width: var(--wide);
+  margin: 2rem auto;
+  padding-inline: 1rem;
 }
 
 .panel[hidden] {
@@ -150,164 +147,83 @@ select {
   --ink: CanvasText;
 }
 
-/* The editor demo's CodeMirror host. */
-.editor {
-  width: 100%;
-  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-  border-radius: 6px;
+/* --- The editor tab: a whole-window editor ------------------------------- */
+
+/* The editor takes everything under the header. MarkdownEditor fills the height it is given,
+   so the page hands it the window's. */
+body[data-tab='editor'] {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.editor .cm-editor {
-  max-height: 34rem;
+body[data-tab='editor'] .demo-header {
+  flex: none;
 }
 
-.editor .cm-scroller {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.82rem;
-  line-height: 1.7;
+body[data-tab='editor'] #panel-editor {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
-.editor .cm-editor.cm-focused {
-  outline: none;
-}
-
-.note {
-  font-size: 0.875rem;
-  opacity: 0.65;
-  max-width: var(--measure);
-}
-
-/* The editor demo's sidebar: one row per sandbox, from describeSandboxBlock(). */
 #app {
   width: 100%;
 }
 
-.with-outline {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  width: 100%;
+body[data-tab='editor'] #app,
+body[data-tab='editor'] .editor {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
-/* variant="inline" anchors the modal here rather than to the viewport. */
-.editor-pane {
-  position: relative;
-  flex: 1 1 28rem;
-  min-width: 0;
-  min-height: 34rem;
-}
-
-.with-outline .editor {
-  width: 100%;
-}
-
-.editor-pane:has(.sbx-modal, .sbx-overlay) {
-  min-height: 42rem;
-}
-
-.editor-pane .sbx-modal.is-inline,
-.editor-pane .sbx-overlay.is-inline {
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.editor-pane .sbx-modal.is-inline {
-  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-}
-
-.outline {
-  flex: 0 1 17rem;
-  min-width: 0;
-}
-
-.outline ol {
-  list-style: none;
-  margin: 0 0 0.75rem;
-  padding: 0;
-}
-
-.outline li {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  border-radius: 5px;
-}
-
-.outline li:hover {
-  background: color-mix(in srgb, currentColor 8%, transparent);
-}
-
-.outline li.is-editing {
-  background: color-mix(in srgb, currentColor 12%, transparent);
-  box-shadow: inset 2px 0 0 currentColor;
-}
-
-.outline li.is-editing .outline-label {
-  font-weight: 600;
-}
-
-.outline-jump,
-.outline-edit {
-  border: none;
-  border-radius: 5px;
-}
-
-.outline-jump {
-  flex: 1 1 auto;
-  min-width: 0;
+/* The demo's own controls: a rail down the right edge of the writing column, the way a host
+   would lay its actions over the editor. */
+.demo-rail {
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  transform: translateY(-50%);
+  z-index: 3;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  padding: 0.35rem 0.45rem;
-  text-align: left;
+  gap: 0.2rem;
+  padding: 0.3rem;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 999px;
+  background: Canvas;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.1);
 }
 
-.outline-kind {
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.5;
-}
-
-.outline-label,
-.outline-detail {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.outline-label {
-  font-size: 0.78rem;
-}
-
-.outline-detail {
-  font-size: 0.68rem;
-  opacity: 0.5;
-}
-
-.outline-edit {
-  padding: 0.25rem 0.4rem;
-  font-size: 0.68rem;
-  opacity: 0;
-}
-
-.outline li:hover .outline-edit {
+.demo-rail button {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
   opacity: 0.7;
 }
 
-.outline li.is-editing .outline-edit {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.outline-edit:hover {
+.demo-rail button:hover {
   opacity: 1;
+  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
-.outline .note {
-  font-size: 0.8rem;
+.demo-rail button[aria-pressed='true'] {
+  opacity: 1;
+  color: Canvas;
+  background: CanvasText;
+}
+
+.demo-rail-sep {
+  height: 1px;
+  margin: 0.2rem 0.4rem;
+  background: color-mix(in srgb, currentColor 18%, transparent);
 }

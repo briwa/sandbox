@@ -1,4 +1,5 @@
 export * from './protocol.js';
+export * from './frontmatter.js';
 
 const PRESETS = new Set(['canvas', 'svg', 'root']);
 const DEFAULT_W = 640;

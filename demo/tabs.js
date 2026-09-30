@@ -25,6 +25,9 @@ async function show(name) {
     else link.removeAttribute('aria-current');
   }
 
+  // The editor tab takes the whole window, so the page lays itself out differently for it.
+  document.body.dataset.tab = tab;
+
   for (const key of Object.keys(TABS)) {
     document.querySelector(`#panel-${key}`).hidden = key !== tab;
   }

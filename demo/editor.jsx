@@ -3,19 +3,13 @@ import './demo.css';
 
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { EditorView } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
-import { markdown } from '@codemirror/lang-markdown';
 
-import { codeServices } from '@briwa.dev/sandbox/editor';
-import { sandboxPreview } from '@briwa.dev/sandbox/codemirror';
-import { SandboxModal, SandboxExternalModal } from '@briwa.dev/sandbox/react';
-import { findSandboxBlocks, describeSandboxBlock, specToToolbar } from '@briwa.dev/sandbox';
+import { joinFrontmatter, readKey } from '@briwa.dev/sandbox';
+import { Icon, MarkdownEditor } from '@briwa.dev/sandbox/react';
 
-const START = `# An entry with figures
-
-Type \`/\` on an empty line to insert a block, or press Edit on a card below.
-The outline beside the editor is one row per sandbox, names and all.
+const START = `Type \`/sandbox\` on an empty line to insert a block, or press the pencil on a card below.
+Opening one puts its code here and its figure, settings and console in the sidebar.
+Your edits are kept in this browser; the reset button on the right brings this sample back.
 
 \`\`\`sandbox=js label="shared helpers"
 const wave = (t, i) => Math.sin(t / 500 + i / 3);
@@ -55,144 +49,99 @@ drawGrid();
 \`\`\`
 `;
 
-const readOutline = (doc) =>
-  findSandboxBlocks(doc).map((block) => ({ ...describeSandboxBlock(block), block }));
+const START_FRONTMATTER = `title: "An entry with figures"\ndate: 2026-09-30\ntags: [demo]\ndraft: true`;
+
+// The document outlives a reload, the way a writer expects of an editor. Browser storage is
+// enough for a demo: it is one visitor's scratch copy, and losing it costs a click of reset.
+const STORE = 'sandbox-demo-doc';
+const load = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE));
+    if (typeof saved?.body === 'string' && typeof saved?.frontmatter === 'string') return saved;
+  } catch {}
+  return { frontmatter: START_FRONTMATTER, body: START };
+};
+const store = (doc) => {
+  try { localStorage.setItem(STORE, JSON.stringify(doc)); } catch {}
+};
+
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 function Editor() {
-  const hostRef = useRef(null);
-  const viewRef = useRef(null);
+  const editorRef = useRef(null);
+  const [initial] = useState(load);
+  const [frontmatter, setFrontmatter] = useState(initial.frontmatter);
+  const [body, setBody] = useState(initial.body);
+  const [preview, setPreview] = useState(false);
+  const [copied, setCopied] = useState(false);
+  // Reset replaces the document outright, which the editor takes as a remount.
+  const [generation, setGeneration] = useState(0);
 
-  const [editing, setEditing] = useState(null);
-  const [outline, setOutline] = useState(() => readOutline(START));
+  useEffect(() => { store({ frontmatter, body }); }, [frontmatter, body]);
 
-  const onEditRef = useRef(null);
-  const onCreateRef = useRef(null);
+  // The whole file, frontmatter and all, read off the editor rather than `body`, which
+  // trails typing by a pause.
+  const markdown = () => joinFrontmatter(frontmatter, editorRef.current?.getDoc() ?? body);
 
-  // Everything in the document except the block being edited — a block must not be its own
-  // sibling, or visualizing a source block would run its code as both prelude and body.
-  const siblingsNow = (self) =>
-    findSandboxBlocks(viewRef.current?.state.doc.toString() ?? '')
-      .filter((b) => b.from !== self?.from);
-
-  onEditRef.current = (block) => {
-    if (editing && editing.from === block.from) return;
-    const base = { from: block.from, to: block.to, siblings: siblingsNow(block) };
-    if (block.kind === 'external') setEditing({ ...base, modal: 'external', initial: { code: block.code, label: block.label || '' } });
-    else setEditing({ ...base, modal: 'sandbox', initial: { ...specToToolbar(block), code: block.code } });
-  };
-
-  // `initial` arrives from sandboxPreview already filled out from its `defaults`.
-  onCreateRef.current = (kind, pos, initial) => {
-    const base = { from: pos, to: pos, siblings: siblingsNow() };
-    setEditing({ ...base, modal: kind === 'external' ? 'external' : 'sandbox', initial });
-  };
-
-  useEffect(() => {
-    const view = new EditorView({
-      state: EditorState.create({
-        doc: START,
-        extensions: [
-          ...codeServices(),
-          markdown(),
-          sandboxPreview({
-            onEdit: (b) => onEditRef.current?.(b),
-            onCreate: (kind, pos, initial) => onCreateRef.current?.(kind, pos, initial),
-            // What `/sandbox` opens with; a shared block is the default when this is left out.
-            defaults: { w: 480, h: 240 },
-          }),
-          EditorView.updateListener.of((u) => {
-            if (u.docChanged) setOutline(readOutline(u.state.doc.toString()));
-          }),
-        ],
-      }),
-      parent: hostRef.current,
-    });
-    viewRef.current = view;
-    return () => { view.destroy(); viewRef.current = null; };
-  }, []);
-
-  function reveal({ block }) {
-    const view = viewRef.current;
-    if (!view) return;
-    view.dispatch({
-      selection: { anchor: block.from },
-      effects: EditorView.scrollIntoView(block.from, { y: 'center' }),
-    });
-    view.focus();
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(markdown());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
   }
 
-  function save(fence, { keepOpen = false } = {}) {
-    const view = viewRef.current;
-    if (!view || !editing) return setEditing(null);
-    const { from, to } = editing;
-
-    const insert = from > 0 && view.state.doc.sliceString(from - 1, from) !== '\n' ? '\n' + fence : fence;
-    const below = view.state.doc.sliceString(to, to + 1) === '\n' ? 1 : 0;
-    view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + insert.length + below } });
-    if (keepOpen) setEditing((s) => (s ? { ...s, to: from + insert.length } : s));
-    else { setEditing(null); view.focus(); }
+  function download() {
+    const url = URL.createObjectURL(new Blob([markdown()], { type: 'text/markdown' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `${slug(readKey(frontmatter, 'title')) || 'entry'}.md` });
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
-  function cancel() {
-    setEditing(null);
-    viewRef.current?.focus();
+  function reset() {
+    if (!confirm('Replace this document with the sample?')) return;
+    setFrontmatter(START_FRONTMATTER);
+    setBody(START);
+    setPreview(false);
+    setGeneration((g) => g + 1);
   }
-
-  const isEditing = (block) =>
-    editing != null && block.from >= editing.from && block.to <= editing.to;
 
   return (
-    <div className="with-outline">
-      <div className="editor-pane">
-        <div className="editor" ref={hostRef} />
-
-        {editing?.modal === 'sandbox' && (
-          <SandboxModal
-            variant="inline"
-            targetKey={editing.from}
-            initial={editing.initial}
-            siblings={editing.siblings}
-            draftKey="demo-sandbox"
-            onSave={save}
-            onCancel={cancel}
-          />
-        )}
-        {editing?.modal === 'external' && (
-          <SandboxExternalModal
-            variant="inline"
-            targetKey={editing.from}
-            initial={editing.initial}
-            onSave={save}
-            onCancel={cancel}
-          />
-        )}
+    <MarkdownEditor
+      key={generation}
+      ref={editorRef}
+      className="editor"
+      initialDoc={body}
+      onChange={setBody}
+      frontmatter={frontmatter}
+      onFrontmatterChange={setFrontmatter}
+      preview={preview}
+      // What `/sandbox` opens with; viz stays off until it is turned on in Settings.
+      defaults={{ w: 480, h: 240 }}
+      draftKey="demo"
+      sidebarKey="demo-sidebar"
+      autoFocus
+    >
+      {/* The host's own controls, laid over the writing column. */}
+      <div className="demo-rail" role="toolbar" aria-label="Document">
+        <button onClick={() => setPreview((v) => !v)} aria-pressed={preview} title={preview ? 'Back to editing' : 'Preview the document'} aria-label="Preview">
+          <Icon name={preview ? 'eyeOff' : 'eye'} size={16} />
+        </button>
+        <button onClick={() => editorRef.current?.scrollToTop()} title="Back to top" aria-label="Back to top">
+          <Icon name="chevronUp" size={16} />
+        </button>
+        <span className="demo-rail-sep" aria-hidden="true" />
+        <button onClick={copy} title={copied ? 'Copied' : 'Copy the markdown'} aria-label="Copy the markdown">
+          <Icon name={copied ? 'check' : 'copy'} size={16} />
+        </button>
+        <button onClick={download} title="Download as .md" aria-label="Download as .md">
+          <Icon name="save" size={16} />
+        </button>
+        <button onClick={reset} title="Reset to the sample" aria-label="Reset to the sample">
+          <Icon name="reset" size={16} />
+        </button>
       </div>
-
-      <aside className="outline">
-        <h2>outline &mdash; {outline.length}</h2>
-        {outline.length === 0 ? (
-          <p className="note">No sandboxes in this document.</p>
-        ) : (
-          <ol>
-            {outline.map((row) => {
-              const active = isEditing(row.block);
-              return (
-                <li key={row.block.from} className={active ? 'is-editing' : undefined} aria-current={active || undefined}>
-                  <button className="outline-jump" onClick={() => reveal(row)} title="Jump to this block">
-                    <span className="outline-kind">{row.kind}</span>
-                    <span className="outline-label">{row.label}</span>
-                    {row.detail && <span className="outline-detail">{row.detail}</span>}
-                  </button>
-                  <button className="outline-edit" onClick={() => onEditRef.current?.(row.block)} disabled={active}>
-                    {active ? 'editing' : 'edit'}
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </aside>
-    </div>
+    </MarkdownEditor>
   );
 }
 

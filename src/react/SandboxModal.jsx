@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { EditorView, lineNumbers } from "@codemirror/view";
 import { EditorState, Compartment } from "@codemirror/state";
 import { syntaxHighlighting, codeFolding, foldGutter, foldKeymap, bracketMatching } from "@codemirror/language";
@@ -7,7 +8,7 @@ import { vue } from "@codemirror/lang-vue";
 import Icon from "./Icon.jsx";
 import { KIND_ICONS } from "../core/icons.js";
 import EditorFind from "./EditorFind.jsx";
-import PreviewConsole, { appendConsole } from "./PreviewConsole.jsx";
+import PreviewConsole, { DockConsole, appendConsole } from "./PreviewConsole.jsx";
 import { codeServices } from "../editor/services.js";
 import { showError, clearError } from "../editor/errors.js";
 import { figureBg } from "../client/index.js";
@@ -19,6 +20,7 @@ import { getCodeFenceSetting, setCodeFenceSetting } from "./storage.js";
 import {
   MSG_ERROR,
   MSG_CONSOLE,
+  MSG_PLAY,
   MSG_KNOBS,
   MSG_PRESS,
   VIZ_SURFACES,
@@ -37,7 +39,9 @@ const langCompartment = new Compartment();
 
 const langSupport = (name) => (name === "vue" ? vue() : javascript());
 
-function buildPreview({ lang, viz, w, h, bg, idle, knobs }, code, siblings) {
+// `control` is the playback the figure runs with: `manual` beside the code, where the modal's
+// own buttons drive it, or the block's own mode when docked, so it plays as it will on the page.
+function buildPreview({ lang, viz, w, h, bg, idle, knobs, control = "manual" }, code, siblings) {
   if (lang === "vue") {
     return buildVueSrcdoc({ w, h, bg }, code, {
       externals: sandboxExternals(siblings),
@@ -46,7 +50,7 @@ function buildPreview({ lang, viz, w, h, bg, idle, knobs }, code, siblings) {
       knobs,
     });
   }
-  const spec = { preset: viz, w, h, bg, control: 'manual', idle, console: true, knobs };
+  const spec = { preset: viz, w, h, bg, control, idle, console: true, knobs };
   return buildSrcdoc(spec, code, sandboxPreludeBlocks(siblings), sandboxExternals(siblings));
 }
 
@@ -63,8 +67,13 @@ export default function SandboxModal({ targetKey, initial, draftKey, ...rest }) 
   );
 }
 
-function SandboxEditor({ variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey }) {
+// `dock` is `{ preview, settings, console }`, three elements a host lays out elsewhere — a
+// sidebar, say. Given them, the modal is only the code: the settings render there as a table
+// instead of behind the gear, and the figure and its console render there instead of beside
+// the code. The state is still all the modal's; only where the pieces are drawn moves.
+function SandboxEditor({ variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey, dock }) {
   const isInline = variant === "inline";
+  const docked = Boolean(dock?.settings && dock?.preview && dock?.console);
 
   const [restored] = useState(() => (draftKey ? loadSandboxDraft(draftKey) : null));
   // `initial` may be partial — just the values a host wants to differ from a fresh block.
@@ -129,21 +138,23 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   // and the reset overlay, root gets the play button and reset. svg draws once and vue is
   // mounted by its own runtime, so `control` has nothing to act on.
   const hasControls = isFigure && !isVue && (viz === "canvas" || viz === "root");
-  const showPreview = isFigure && previewOpen;
+  const showPreview = isFigure && previewOpen && !docked;
   const tags = isFigure ? [[lang, lang], [viz, viz]] : KIND_ICONS[isVue ? "vue" : "source"];
 
-  function updatePreview() {
+  // `clean: false` re-runs the figure without calling the edits saved — for a rebuild that
+  // only changes how the preview plays, not what the block says.
+  function updatePreview({ clean = true } = {}) {
     if (!isFigure) return;
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     const width = Number(w) || 0;
     const height = Number(h) || 0;
 
     clearError(cmRef.current);
-    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg(), idle: Number(idle) || 0, knobs: knobValsRef.current }, body, siblings));
+    setSrcdoc(buildPreview({ lang, viz, w: width, h: height, bg: bg || figureBg(), idle: Number(idle) || 0, knobs: knobValsRef.current, control: docked ? control : "manual" }, body, siblings));
     setPreviewW(width || 640);
     setPreviewH(height || 360);
     setFrameKey((k) => k + 1);
-    setDirty(false);
+    if (clean) setDirty(false);
   }
 
   const persist = () => {
@@ -233,7 +244,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   // fell straight through the guard — so every modal opened already dirty and
   // wrote a recovery draft for an edit nobody had made. Comparing snapshots
   // instead is indifferent to how many times the effect runs.
-  const metaSnapshot = JSON.stringify([lang, viz, w, h, bg, open, idle, label]);
+  const metaSnapshot = JSON.stringify([lang, viz, w, h, bg, open, idle, label, control]);
   const draftSnapshot = JSON.stringify([lang, viz, w, h, bg, showCode, open, control, idle, meta, label]);
   const metaSeenRef = useRef(metaSnapshot);
   const draftSeenRef = useRef(draftSnapshot);
@@ -264,6 +275,16 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
   }, []);
 
   useEffect(() => { setPlaying(false); setLogs([]); knobDefsRef.current = []; setKnobSig(""); }, [frameKey]);
+
+  // Docked and beside the code, the figure runs under different playback (see buildPreview),
+  // so moving between the two rebuilds it — and docked, so does picking another `control`,
+  // which is only seen by running it.
+  const playbackSeenRef = useRef([docked, control]);
+  useEffect(() => {
+    const [wasDocked, wasControl] = playbackSeenRef.current;
+    playbackSeenRef.current = [docked, control];
+    if (docked !== wasDocked || (docked && control !== wasControl)) updatePreview({ clean: false });
+  }, [docked, control]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -413,6 +434,136 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     return true;
   };
 
+  const stage = (
+    <>
+      <div className="sbx-frame-wrap" ref={knobsRef} style={{ width: `${previewW}px` }}>
+        <iframe
+          key={frameKey}
+          ref={frameRef}
+          className="sbx-frame"
+          style={{ aspectRatio: `${previewW} / ${previewH}` }}
+          sandbox="allow-scripts"
+          title="live figure preview"
+          srcDoc={srcdoc}
+        />
+        {knobSig && (
+          <button
+            className="sbx-knobs-btn"
+            onClick={() => setKnobsOpen((o) => !o)}
+            title="Settings"
+            aria-label="Figure settings"
+            aria-haspopup="true"
+            aria-expanded={knobsOpen}
+          >
+            <Icon name="settings" size={14} />
+          </button>
+        )}
+        {knobSig && knobsOpen && <div ref={knobHostRef} />}
+      </div>
+      {hasPreviewControls && (
+        <div className="sbx-controls" role="toolbar" aria-label="Preview controls">
+          <button className="sbx-ctl sbx-icon" onClick={togglePlay} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
+            <Icon name={playing ? "pause" : "play"} size={16} />
+          </button>
+          <button className="sbx-ctl sbx-icon" onClick={resetFrame} title="Restart the preview" aria-label="Restart the preview">
+            <Icon name="reset" size={16} />
+          </button>
+        </div>
+      )}
+    </>
+  );
+
+  const consolePane = <PreviewConsole logs={logs} onClear={() => setLogs([])} />;
+
+  // Docked, the figure is drawn the way the rendered page draws it: its playback controls are
+  // the frame's own, per `control`, and its knobs hang off the same corner button. A `hover`
+  // figure is driven from out here, since the frame never sees the pointer come or go.
+  const isHoverCtl = hasControls && control === "hover";
+  const postFrame = (msg) => frameRef.current?.contentWindow?.postMessage(msg, "*");
+  const dockStage = (
+    <div
+      className="sbx-dock-figure"
+      ref={knobsRef}
+      style={{ width: `${previewW}px` }}
+      onPointerEnter={isHoverCtl ? () => postFrame({ [MSG_PLAY]: true }) : undefined}
+      onPointerLeave={isHoverCtl ? () => postFrame({ [MSG_PLAY]: false }) : undefined}
+    >
+      <iframe
+        key={frameKey}
+        ref={frameRef}
+        className="sbx-frame"
+        style={{ aspectRatio: `${previewW} / ${previewH}` }}
+        sandbox="allow-scripts"
+        title="live figure preview"
+        srcDoc={srcdoc}
+      />
+      {isHoverCtl && <div className="sandbox-hover" aria-hidden="true" />}
+      {knobSig && (
+        <div className="sandbox-tools">
+          <button
+            type="button"
+            className="sandbox-knobs-btn"
+            onClick={() => setKnobsOpen((o) => !o)}
+            title="Settings"
+            aria-label="Figure settings"
+            aria-haspopup="true"
+            aria-expanded={knobsOpen}
+          >
+            <Icon name="settings" size={15} />
+          </button>
+        </div>
+      )}
+      {knobSig && knobsOpen && <div ref={knobHostRef} />}
+    </div>
+  );
+
+  // The gear panel's fields, as a table for a dock. Same state, same rules for what shows.
+  const settingsTable = (
+    <table className="sbx-table" aria-label="Settings">
+      <tbody>
+        {/* Labelled with the fence's own words: `sandbox=js`, `viz=svg`, `open`, `code`… */}
+        <Row label="sandbox">
+          <select value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Language">
+            <option value="js">js</option>
+            <option value="vue">vue</option>
+          </select>
+        </Row>
+        <Row label="viz">
+          <select value={viz} onChange={(e) => setViz(e.target.value)} aria-label="Visualize">
+            <option value="">no</option>
+            {VIZ_SURFACES[lang].map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </Row>
+        <Row label="label">
+          <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} aria-label={!isFigure && isVue ? "Component name" : "Label"} />
+        </Row>
+        {isFigure && (
+          <>
+            <Row label="w"><input type="number" min="1" value={w} onChange={(e) => setW(e.target.value)} aria-label="Width" /></Row>
+            <Row label="h"><input type="number" min="1" value={h} onChange={(e) => setH(e.target.value)} aria-label="Height" /></Row>
+            <Row label="bg"><input type="text" value={bg} onChange={(e) => setBg(e.target.value)} aria-label="Background" /></Row>
+            {hasControls && (
+              <Row label="control">
+                <select value={control} onChange={(e) => setControl(e.target.value)} aria-label="Controls">
+                  {CONTROL_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </Row>
+            )}
+            {hasControls && (
+              <Row label="idle"><input type="number" min="0" step="100" value={idle} onChange={(e) => setIdle(e.target.value)} aria-label="Idle frame in milliseconds" /></Row>
+            )}
+            <Row label="meta"><input type="text" value={meta} onChange={(e) => setMeta(e.target.value)} aria-label="meta" /></Row>
+            <Row label="code"><BoolSelect value={showCode || open} disabled={open} onChange={setShowCode} label="Show code" /></Row>
+            <Row label="open"><BoolSelect value={open} onChange={setOpen} label="Start on code" /></Row>
+          </>
+        )}
+        {!isFigure && (
+          <Row label="open"><BoolSelect value={open} onChange={setOpen} label="Start open" /></Row>
+        )}
+      </tbody>
+    </table>
+  );
+
   return (
     <div
       ref={modalRef}
@@ -427,7 +578,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
             <Icon name="save" size={15} />
           </button>
         )}
-        <div className="sbx-settings" ref={settingsRef}>
+        {!docked && <div className="sbx-settings" ref={settingsRef}>
           <button
             className={`sbx-float-btn ${settingsOpen ? "is-on" : ""}`}
             onClick={() => setSettingsOpen((o) => !o)}
@@ -503,9 +654,9 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
               )}
             </div>
           )}
-        </div>
-        <span className="sbx-float-sep" aria-hidden="true" />
-        {isFigure && (
+        </div>}
+        {!docked && <span className="sbx-float-sep" aria-hidden="true" />}
+        {isFigure && !docked && (
           <button
             className={`sbx-float-btn ${previewOpen ? "is-on" : ""}`}
             onClick={togglePreview}
@@ -549,48 +700,37 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
             onPointerDown={startResize}
           />
         )}
-        {isFigure && (
+        {isFigure && !docked && (
           <div className="sbx-preview" hidden={!previewOpen}>
-            <div className="sbx-preview-stage">
-              <div className="sbx-frame-wrap" ref={knobsRef} style={{ width: `${previewW}px` }}>
-                <iframe
-                  key={frameKey}
-                  ref={frameRef}
-                  className="sbx-frame"
-                  style={{ aspectRatio: `${previewW} / ${previewH}` }}
-                  sandbox="allow-scripts"
-                  title="live figure preview"
-                  srcDoc={srcdoc}
-                />
-                {knobSig && (
-                  <button
-                    className="sbx-knobs-btn"
-                    onClick={() => setKnobsOpen((o) => !o)}
-                    title="Settings"
-                    aria-label="Figure settings"
-                    aria-haspopup="true"
-                    aria-expanded={knobsOpen}
-                  >
-                    <Icon name="settings" size={14} />
-                  </button>
-                )}
-                {knobSig && knobsOpen && <div ref={knobHostRef} />}
-              </div>
-              {hasPreviewControls && (
-                <div className="sbx-controls" role="toolbar" aria-label="Preview controls">
-                  <button className="sbx-ctl sbx-icon" onClick={togglePlay} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
-                    <Icon name={playing ? "pause" : "play"} size={16} />
-                  </button>
-                  <button className="sbx-ctl sbx-icon" onClick={resetFrame} title="Restart the preview" aria-label="Restart the preview">
-                    <Icon name="reset" size={16} />
-                  </button>
-                </div>
-              )}
-            </div>
-            <PreviewConsole logs={logs} onClear={() => setLogs([])} />
+            <div className="sbx-preview-stage">{stage}</div>
+            {consolePane}
           </div>
         )}
       </div>
+      {docked && createPortal(settingsTable, dock.settings)}
+      {docked && isFigure && createPortal(<div className="sbx-dock-preview">{dockStage}</div>, dock.preview)}
+      {docked && isFigure && createPortal(<DockConsole logs={logs} onClear={() => setLogs([])} />, dock.console)}
     </div>
+  );
+}
+
+// One row of the docked settings table: the name, then the value as an input that reads as
+// plain text until it is edited.
+function Row({ label, children }) {
+  return (
+    <tr>
+      <th scope="row">{label}</th>
+      <td>{children}</td>
+    </tr>
+  );
+}
+
+// true/false as a dropdown, so every value in the table is text and a choice reads the same way.
+function BoolSelect({ value, onChange, disabled, label }) {
+  return (
+    <select value={String(Boolean(value))} onChange={(e) => onChange(e.target.value === "true")} disabled={disabled} aria-label={label}>
+      <option value="false">false</option>
+      <option value="true">true</option>
+    </select>
   );
 }

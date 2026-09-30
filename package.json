@@ -22,6 +22,7 @@
     "./styles": "./styles/all.css",
     "./styles/figure.css": "./styles/figure.css",
     "./styles/editor.css": "./styles/editor.css",
+    "./styles/markdown.css": "./styles/markdown.css",
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -72,6 +73,7 @@
     "@codemirror/autocomplete": "^6",
     "@codemirror/commands": "^6",
     "@codemirror/lang-javascript": "^6",
+    "@codemirror/lang-markdown": "^6",
     "@codemirror/lang-vue": "^0.1",
     "@codemirror/language": "^6",
     "@codemirror/state": "^6",

@@ -1,0 +1,442 @@
+@import "./tokens.css";
+
+/* MarkdownEditor: the writing column, then the sidebar on its right. The root fills whatever
+   height the host gives it; the sidebar carries its own width, which the writer drags, and
+   folded it shrinks to the tab that brings it back. */
+.sbx-md {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  color: var(--sbx-ink);
+}
+
+/* The writing column and everything that floats over it — the modals fill it, and a host's
+   controls measure from it, so opening the sidebar moves them along with the text. */
+.sbx-md-main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.sbx-md-main > .editor-find { position: absolute; top: 0.75rem; right: 0.75rem; }
+
+/* --- Document column ------------------------------------------------------ */
+
+/* Title, a rule, then the body: one scrolling surface, so the title scrolls away with the
+   text it belongs to. Hidden by class while previewing; `display` here would beat `hidden`. */
+.sbx-md-doc,
+.sbx-md-preview { min-width: 0; overflow: auto; }
+.sbx-md-doc { display: flex; flex-direction: column; }
+.sbx-md-doc.is-hidden { display: none; }
+
+.sbx-md-titlebar {
+  max-width: 78ch;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 1.75rem 1rem 0.9rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--sbx-rule);
+}
+.sbx-md-title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--sbx-sans);
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--sbx-ink);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.sbx-md-title::placeholder { color: var(--sbx-muted); opacity: 0.55; font-weight: 600; }
+.sbx-md-title:focus { outline: none; }
+
+.sbx-md-body { flex: 1; min-height: 0; overflow: auto; }
+.sbx-md-body .cm-editor { height: 100%; }
+.sbx-md-body .cm-scroller {
+  font-family: var(--sbx-mono);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  padding: 1.1rem 0 calc(1.1rem + env(safe-area-inset-bottom));
+}
+.sbx-md-body .cm-content { max-width: 78ch; margin: 0 auto; padding-inline: 1rem; box-sizing: border-box; }
+.sbx-md-body .cm-focused { outline: none; }
+
+/* --- Preview -------------------------------------------------------------- */
+
+/* The measure lives on the wrapper, not the heading: `ch` on the heading would resolve
+   against its own 1.6rem font and come out far too wide. */
+.sbx-md-preview-head {
+  max-width: 72ch;
+  margin: 0 auto;
+  padding: 1.75rem 1rem 0.9rem;
+  border-bottom: 1px solid var(--sbx-rule);
+}
+.sbx-md-preview-title {
+  margin: 0;
+  font-family: var(--sbx-sans);
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--sbx-ink);
+}
+.sbx-md-preview-body { max-width: 72ch; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+.sbx-md-preview-body img { max-width: 100%; }
+.sbx-md-preview-body pre {
+  overflow-x: auto;
+  padding: 0.8rem;
+  border: 1px solid var(--sbx-rule);
+  border-radius: var(--sbx-radius);
+  background: var(--sbx-panel);
+  font-family: var(--sbx-mono);
+  font-size: 0.85rem;
+}
+.sbx-md-preview-body :not(pre) > code {
+  font-family: var(--sbx-mono);
+  font-size: 0.88em;
+  background: var(--sbx-hover);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+.sbx-md-preview-body blockquote {
+  margin-inline: 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--sbx-rule);
+  color: var(--sbx-muted);
+}
+.sbx-md-preview-error { color: var(--sbx-danger); font-family: var(--sbx-mono); font-size: 0.85rem; }
+
+/* --- Sidebar -------------------------------------------------------------- */
+
+/* Width comes from the component, read back from storage before the first paint, so a
+   remembered column does not visibly snap into place. */
+.sbx-md-side {
+  position: relative;
+  width: var(--sbx-md-side-w, 340px);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--sbx-rule);
+  background: var(--sbx-panel);
+}
+/* Folded: nothing but the tab, which hangs past the column's edge. */
+.sbx-md-side.is-collapsed { width: 0; border-left: 0; }
+
+/* Hung off the edge of the folded column, halfway down. Well under the modal's 1000: the
+   modal is inset into the writing column beside this. */
+.sbx-md-side-tab {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  z-index: 6;
+  width: 1.05rem;
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--sbx-rule);
+  border-right: 0;
+  border-radius: var(--sbx-radius) 0 0 var(--sbx-radius);
+  background: var(--sbx-panel);
+  color: var(--sbx-muted);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+.sbx-md-side-tab:hover { background: var(--sbx-hover); color: var(--sbx-ink); }
+.sbx-md-side-tab svg { width: 0.8rem; height: 0.8rem; }
+
+.sbx-md-side-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+.sbx-md-side-hint { margin: 0.35rem 0 0; font-size: 0.75rem; line-height: 1.5; color: var(--sbx-muted); }
+
+.sbx-md-sect + .sbx-md-sect { border-top: 1px solid var(--sbx-rule); }
+/* The open block's sections: there only while the modal has put something in them. */
+.sbx-md-sect.is-slot:not(:has(.sbx-md-slot > *)) { display: none; }
+.sbx-md-slot[hidden] { display: none; }
+
+/* The preview sits above the scrolling sections, so it stays put when the console opens. It
+   does not clip: the figure is already scaled to the column's width, and the knobs popover
+   has to hang over the sections below it, the way it hangs over the text on a page. */
+.sbx-md-side > .sbx-md-sect-preview {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  border-bottom: 1px solid var(--sbx-rule);
+}
+
+/* The console, pinned under the sections rather than scrolling with them — so closed, the
+   sections' scroll ends at its head. Open, it takes everything below the preview. */
+.sbx-md-console {
+  flex: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--sbx-rule);
+}
+.sbx-md-console:empty { display: none; }
+.sbx-md-side:has(.sbx-md-console-sect.is-open) .sbx-md-side-body { display: none; }
+.sbx-md-side:has(.sbx-md-console-sect.is-open) .sbx-md-console { flex: 1; border-top: 0; }
+.sbx-md-console-sect { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sbx-md-console-sect .sbx-md-sect-head { display: flex; align-items: center; background: var(--sbx-panel); }
+.sbx-md-console-sect .sbx-md-sect-toggle { flex: 1; position: static; }
+.sbx-md-sect-act {
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin-right: 0.35rem;
+  padding: 0.25rem;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--sbx-muted);
+  cursor: pointer;
+}
+.sbx-md-sect-act:hover { background: var(--sbx-hover); color: var(--sbx-ink); }
+.sbx-md-console-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid color-mix(in srgb, var(--sbx-rule) 60%, transparent);
+}
+
+/* The open block's figure, scaled down to the column and drawn as the page draws it: the
+   tool corner, the knobs popover and a hover figure's pointer catcher all hang off it. */
+.sbx-dock-preview { display: flex; flex-direction: column; align-items: center; }
+.sbx-dock-figure { position: relative; flex: none; max-width: 100%; }
+
+/* Settings and frontmatter: a name, then its value as an input that reads as plain text
+   until it is focused. */
+.sbx-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.78rem; }
+.sbx-table tr + tr > * { border-top: 1px solid color-mix(in srgb, var(--sbx-rule) 60%, transparent); }
+.sbx-table th,
+.sbx-table td { padding: 0; vertical-align: middle; }
+.sbx-table th {
+  width: 38%;
+  text-align: left;
+  font-weight: 400;
+  color: var(--sbx-muted);
+  font-family: var(--sbx-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 0.4rem;
+}
+.sbx-table input,
+.sbx-table select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.3rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sbx-ink);
+  font: inherit;
+  font-family: var(--sbx-mono);
+}
+.sbx-table th input { color: var(--sbx-muted); }
+/* A plain label lines up with the text of an editable key beside it. */
+.sbx-table th:not(:has(input)) { padding-left: calc(0.35rem + 1px); }
+.sbx-table input:hover,
+.sbx-table select:hover { border-color: var(--sbx-rule); }
+.sbx-table input:focus,
+.sbx-table select:focus { outline: none; border-color: var(--sbx-accent); background: var(--sbx-surface); }
+.sbx-table select:disabled { opacity: 0.5; }
+.sbx-table-act { width: 1.6rem; text-align: center; }
+.sbx-table-act button {
+  padding: 0 0.3rem;
+  border: 0;
+  background: none;
+  color: var(--sbx-muted);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  cursor: pointer;
+  opacity: 0;
+}
+.sbx-table tr:hover .sbx-table-act button,
+.sbx-table-act button:focus-visible,
+.sbx-table-add .sbx-table-act button { opacity: 1; }
+.sbx-table-act button:hover:not(:disabled) { color: var(--sbx-ink); }
+.sbx-table-act button:disabled { opacity: 0.35 !important; cursor: default; }
+.sbx-table-add input::placeholder { color: var(--sbx-muted); opacity: 0.6; }
+/* A value that carries on below its key — a list, a nested map — as the lines it spans. */
+.sbx-table-block {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0.1rem 0 0.25rem;
+  padding: 0.3rem 0.35rem;
+  border: 1px solid var(--sbx-rule);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sbx-ink);
+  font: inherit;
+  font-family: var(--sbx-mono);
+  line-height: 1.45;
+  resize: vertical;
+}
+.sbx-table-block:focus { outline: none; border-color: var(--sbx-accent); background: var(--sbx-surface); }
+.sbx-table th:has(+ td .sbx-table-block) { vertical-align: top; }
+/* An h2 for the outline's sake, so a host's own heading styles are undone here. */
+.sbx-md-sect-head { margin: 0; font-size: inherit; font-weight: inherit; letter-spacing: normal; text-transform: none; opacity: 1; }
+/* Sticky, so a long section keeps its own label on screen while it scrolls. */
+.sbx-md-sect-toggle {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font: inherit;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.6rem 0.4rem 0.3rem;
+  border: 0;
+  background: var(--sbx-panel);
+  color: var(--sbx-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.sbx-md-sect-toggle:hover { background: var(--sbx-hover); }
+.sbx-md-sect-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sbx-md-count {
+  margin-left: auto;
+  font-family: var(--sbx-mono);
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  background: var(--sbx-hover);
+  color: var(--sbx-muted);
+}
+.sbx-md-chevron { flex: none; width: 0.85rem; height: 0.85rem; color: var(--sbx-muted); transition: transform 120ms ease; }
+.sbx-md-sect.is-open .sbx-md-chevron { transform: rotate(90deg); }
+.sbx-md-sect-body { padding: 0 0.6rem 0.7rem; }
+
+/* A hit area wider than the rule it sits on, lit on hover so the column reads as draggable. */
+.sbx-md-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 7px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sbx-md-resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 3px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+.sbx-md-resizer:hover::after,
+.sbx-md-resizer:focus-visible::after,
+.sbx-md-resizer.is-dragging::after { background: var(--sbx-accent); }
+.sbx-md-resizer:focus-visible { outline: none; }
+
+/* --- Sandbox rows --------------------------------------------------------- */
+
+.sbx-md-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+/* The row and, while its block is open, the button that closes it — siblings, because a
+   button cannot be nested inside another one. */
+.sbx-md-rows li { display: flex; align-items: center; border-radius: var(--sbx-radius); }
+.sbx-md-rows li:hover,
+.sbx-md-rows li.is-active { background: var(--sbx-hover); }
+.sbx-md-rows li.is-active .sbx-md-row-label { color: var(--sbx-accent); font-weight: 600; }
+.sbx-md-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem;
+  border: 0;
+  border-radius: var(--sbx-radius);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sbx-md-row-close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  margin-right: 0.15rem;
+  border: 0;
+  border-radius: var(--sbx-radius);
+  background: transparent;
+  color: var(--sbx-muted);
+  cursor: pointer;
+}
+.sbx-md-row-close svg { width: 14px; height: 14px; }
+.sbx-md-row-close:hover { background: var(--sbx-hover); color: var(--sbx-ink); }
+/* Figures solid, the shared pieces hollow: one is a thing on the page, the others are things
+   it is built from. */
+.sbx-md-kind { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--sbx-accent); }
+.sbx-md-kind-source,
+.sbx-md-kind-external,
+.sbx-md-kind-vue { background: none; border: 1.5px solid var(--sbx-muted); }
+.sbx-md-row-text { min-width: 0; display: flex; flex-direction: column; }
+.sbx-md-row-label,
+.sbx-md-row-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sbx-md-row-label { font-size: 0.82rem; color: var(--sbx-ink); }
+.sbx-md-row-detail { font-size: 0.72rem; color: var(--sbx-muted); }
+.sbx-md-row-warn { flex: none; margin-left: auto; font-weight: 700; color: var(--sbx-warn); }
+
+@media (pointer: coarse) {
+  /* 16px, or iOS zooms the page into the field. */
+  .sbx-table input,
+  .sbx-table select,
+  .sbx-table-block,
+  .sbx-md-body .cm-scroller { font-size: 16px; }
+}
+
+/* No room for a second column, so the sidebar lies down under the text. Its stored width
+   means nothing here, and there is no edge to drag. */
+@media (max-width: 720px) {
+  .sbx-md { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .sbx-md-side { width: auto; max-height: 45vh; border-left: 0; border-top: 1px solid var(--sbx-rule); }
+  .sbx-md-side.is-collapsed { width: auto; max-height: 0; border-top: 0; }
+  .sbx-md-side-tab {
+    top: auto;
+    bottom: 100%;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2.6rem;
+    height: 1.05rem;
+    border: 1px solid var(--sbx-rule);
+    border-bottom: 0;
+    border-radius: var(--sbx-radius) var(--sbx-radius) 0 0;
+  }
+  .sbx-md-side-tab svg { transform: rotate(90deg); }
+  .sbx-md-resizer { display: none; }
+}
