@@ -312,7 +312,25 @@ export function mountFigures({
     // A figure swaps its code for the preview; a shared block has nothing to swap it for,
     // so its button only ever shows or hides the code.
     if (fig.classList.contains('sandbox-lib')) setBtn(btn, showingCode ? 'code' : 'codeOff', showingCode ? 'Show code' : 'Hide code');
-    else setBtn(btn, showingCode ? 'code' : 'eye', showingCode ? 'Show code' : 'Show preview');
+    else {
+      setBtn(btn, showingCode ? 'code' : 'eye', showingCode ? 'Show code' : 'Show preview');
+      const frame = fig.querySelector(selector);
+      if (frame) showingCode ? reloadFrame(frame) : unloadFrame(fig, frame);
+    }
+  };
+
+  const unloadFrame = (fig, frame) => {
+    if (!frame.hasAttribute('srcdoc')) return;
+    frame.setAttribute('data-unloaded', frame.getAttribute('srcdoc'));
+    frame.removeAttribute('srcdoc');
+    reported.delete(frame);
+    if (knobs) attachFigureKnobs(fig, [], () => {});
+  };
+  const reloadFrame = (frame) => {
+    const doc = frame.getAttribute('data-unloaded');
+    if (doc == null) return;
+    frame.removeAttribute('data-unloaded');
+    frame.srcdoc = doc;
   };
   if (toggle) document.addEventListener('click', onToggle);
   document.addEventListener('pointerdown', clearHit);
