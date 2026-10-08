@@ -104,5 +104,8 @@
     "unified": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "prettier": "^3.9.9"
   }
 }

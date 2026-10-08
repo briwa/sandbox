@@ -30,6 +30,7 @@ import { readKey, writeKey } from "../core/frontmatter.js";
 //   draftKey                        scopes the modals' unsaved drafts, e.g. the document's id
 //   codeLanguages                   highlighting for ordinary fences (@codemirror/language-data)
 //   sidebarKey                      where the sidebar's width and folds are remembered
+//   formatOnSave                    run Prettier over a block's code when its modal saves
 //   children                        the host's own controls, laid over the writing column
 //
 // and drives it through the ref: getDoc, setDoc, focus, scrollToTop, openBlock(index),
@@ -51,6 +52,7 @@ const MarkdownEditor = forwardRef(function MarkdownEditor(
     extensions = [],
     sidebar = true,
     sidebarKey = "sbx-md-sidebar",
+    formatOnSave = false,
     autoFocus = false,
     className = "",
     children,
@@ -287,6 +289,7 @@ const MarkdownEditor = forwardRef(function MarkdownEditor(
             siblings={editing.siblings}
             draftKey={draft(editing.modal)}
             dock={sidebar ? dock : undefined}
+            formatOnSave={formatOnSave}
             onSave={save}
             onCancel={cancel}
           />

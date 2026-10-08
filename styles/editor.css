@@ -200,8 +200,12 @@
   flex: 1;
   min-width: 0;
   overflow: auto;
+  /* Off the pane's edges, as the document column is: inline here, so the line numbers
+     move in with the text; block on the scroller, so it scrolls with it. */
+  padding-inline: 0.5rem 0.75rem;
 }
 .sbx-code .cm-editor { height: 100%; }
+.sbx-code .cm-scroller { padding-block: 0.75rem; }
 
 .editor-find {
   z-index: 25;

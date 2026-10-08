@@ -11,6 +11,7 @@ import EditorFind from "./EditorFind.jsx";
 import { DockConsole, appendConsole } from "./PreviewConsole.jsx";
 import { codeServices } from "../editor/services.js";
 import { showError, clearError } from "../editor/errors.js";
+import { formatView } from "../editor/format.js";
 import { figureBg } from "../client/index.js";
 import { knobsPanel, knobsSignature, knobMessage, knobResetMessage } from "../client/knobs.js";
 import { codeHighlightStyle } from "../editor/highlight.js";
@@ -73,7 +74,7 @@ export default function SandboxModal({ targetKey, initial, draftKey, ...rest }) 
 // sidebar, say. The modal is only ever the code: the figure and its console render in the
 // dock, and so do the settings, as a table instead of behind the gear. Without a dock there
 // is no preview. The state is still all the modal's; only where the pieces are drawn moves.
-function SandboxEditor({ variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey, dock }) {
+function SandboxEditor({ variant = "fixed", className = "", initial, siblings = [], onSave, onCancel, draftKey, dock, formatOnSave = false }) {
   const isInline = variant === "inline";
   const docked = Boolean(dock?.settings && dock?.preview && dock?.console);
 
@@ -175,7 +176,7 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
           codeFolding(),
           foldGutter({ openText: "⌄", closedText: "›" }),
 
-          ...codeServices(foldKeymap),
+          ...codeServices([...foldKeymap, { key: "Shift-Alt-f", run: () => { formatRef.current?.(); return true; }, preventDefault: true }]),
 
           bracketMatching(),
           langCompartment.of(langSupport(codeLang)),
@@ -368,7 +369,14 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
     frameRef.current?.contentWindow?.postMessage({ [MSG_RESET]: true }, "*");
   }
 
-  function save() {
+  function format() {
+    return formatView(cmRef.current, { lang });
+  }
+  const formatRef = useRef(null);
+  formatRef.current = format;
+
+  async function save() {
+    if (formatOnSave) await format();
     const body = cmRef.current ? cmRef.current.state.doc.toString() : seed.code || "";
     if (isFigure) {
       const state = { kind: "figure", type: isVue ? "vue" : viz, w: Number(w) || undefined, h: Number(h) || undefined, bg, showCode, open, control, idle: Number(idle) || 0, meta, label };
@@ -504,6 +512,9 @@ function SandboxEditor({ variant = "fixed", className = "", initial, siblings = 
             <Icon name="save" size={15} />
           </button>
         )}
+        <button className="sbx-float-btn" onClick={format} title="Format (⇧⌥F)" aria-label="Format">
+          <Icon name="format" size={15} />
+        </button>
         {!docked && <div className="sbx-settings" ref={settingsRef}>
           <button
             className={`sbx-float-btn ${settingsOpen ? "is-on" : ""}`}
