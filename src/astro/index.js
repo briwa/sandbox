@@ -35,7 +35,6 @@ export default function sandbox(options = {}) {
     remark = true,
     client = true,
     styles = true,
-    editorStyles = false,
     shiki,
     // Astro's own shiki already colours every ordinary fence, in every language it
     // knows, so the fence pass is off unless a site asks for the figure highlighter's
@@ -58,7 +57,6 @@ export default function sandbox(options = {}) {
 
         const head = [];
         if (styles) head.push(`import '@briwa.dev/sandbox/styles/figure.css';`);
-        if (editorStyles) head.push(`import '@briwa.dev/sandbox/styles/editor.css';`);
         if (client) {
           head.push(
             `import { mountFigures } from '@briwa.dev/sandbox/client';`,

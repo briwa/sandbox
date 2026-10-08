@@ -1,9 +1,8 @@
-// Markdown → HTML for a host that is not Astro: the demo, the editor's preview, anything
+// Markdown → HTML for a host that is not Astro: the demo, an editor's preview, anything
 // that renders in the browser. The Astro integration wires the same plugins into the
 // site's own processor; this is the same pipeline with unified wrapped around it.
 //
-// `highlight` is the host's highlighter — `highlightCode` from `@briwa.dev/sandbox/editor`
-// is the one that matches the editor's own colouring. `fences`, `links`, `languages` and `lazy`
+// `highlight` is the host's highlighter, e.g. a lezer or shiki one. `fences`, `links`, `languages` and `lazy`
 // are passed through to `sandboxMarkdownPlugins`; `remarkPlugins` and `rehypePlugins` are
 // the host's own passes, run after the preset's on each side.
 //

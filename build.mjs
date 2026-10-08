@@ -5,9 +5,6 @@ const entryPoints = [
   'src/client/index.js',
   'src/remark/index.js',
   'src/markdown/index.js',
-  'src/codemirror/index.js',
-  'src/editor/index.js',
-  'src/react/index.js',
   'src/astro/index.js',
 ];
 

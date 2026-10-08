@@ -5,7 +5,6 @@ import { mountFigures } from '@briwa.dev/sandbox/client';
 const TABS = {
   figures: () => import('./figures.js'),
   controls: () => import('./controls.js'),
-  editor: () => import('./editor.jsx'),
 };
 
 // One host for every tab: mountFigures resolves its frames lazily, so figures a tab
@@ -24,9 +23,6 @@ async function show(name) {
     if (link.dataset.tab === tab) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
-
-  // The editor tab takes the whole window, so the page lays itself out differently for it.
-  document.body.dataset.tab = tab;
 
   for (const key of Object.keys(TABS)) {
     document.querySelector(`#panel-${key}`).hidden = key !== tab;

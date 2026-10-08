@@ -2,7 +2,7 @@ import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KN
 import { iconSvg } from '../core/icons.js';
 import { attachFigureKnobs, toggleFigureKnobs, closeFigureKnobs, knobMessage, knobResetMessage } from './knobs.js';
 
-export { knobsPanel, knobsSignature, attachFigureKnobs, toggleFigureKnobs, closeFigureKnobs } from './knobs.js';
+export { knobsPanel, knobsSignature, knobMessage, knobResetMessage, attachFigureKnobs, toggleFigureKnobs, closeFigureKnobs } from './knobs.js';
 
 let bgVar = '--bg';
 
