@@ -5,7 +5,7 @@ import { renderMarkdown } from './render.js';
 const source = `
 ## canvas (+ knobs)
 
-\`\`\`sandbox=js viz 480x260 control=autoplay code
+\`\`\`js sandbox=canvas 480x260 control=autoplay code
 const count = knob(60, { min: 6, max: 120 });
 const radius = knob(70, { min: 20, max: 110 });
 const dot = knob(3, { min: 1, max: 8 });
@@ -25,19 +25,9 @@ loop((t) => {
 });
 \`\`\`
 
-## svg
-
-\`\`\`sandbox=js viz=svg 480x160 control=none code
-svg.innerHTML = Array.from({ length: 24 }, (_, i) => {
-  const x = 12 + i * 19.5;
-  const h = 20 + Math.abs(Math.sin(i / 3)) * 110;
-  return \`<rect x="\${x}" y="\${150 - h}" width="12" height="\${h}" rx="2" fill="hsl(\${i * 14} 65% 55%)"/>\`;
-}).join('');
-\`\`\`
-
 ## Shared source
 
-\`\`\`sandbox=js open label="easing helpers"
+\`\`\`js sandbox open label="easing helpers"
 const easeInOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
 const pingPong = (t, ms) => {
   const p = (t % (ms * 2)) / ms;
@@ -45,7 +35,7 @@ const pingPong = (t, ms) => {
 };
 \`\`\`
 
-\`\`\`sandbox=js viz 480x220 control=autoplay code
+\`\`\`js sandbox=canvas 480x220 control=autoplay code
 loop((t) => {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = 'currentColor';
@@ -61,11 +51,11 @@ loop((t) => {
 
 ## root + external
 
-\`\`\`sandbox=external
+\`\`\`text sandbox=external
 https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.js
 \`\`\`
 
-\`\`\`sandbox=js viz=root 480x140 control=none code
+\`\`\`js sandbox=root 480x140 control=none code
 root.style.display = 'grid';
 root.style.placeItems = 'center';
 const btn = document.createElement('button');
@@ -83,48 +73,42 @@ root.append(btn);
 
 ## vue
 
-\`\`\`sandbox=vue viz 480x170 code
-<template>
-  <div :style="box">
-    <button :style="btn" @click="n -= step">-</button>
-    <strong :style="{ fontSize: '28px', minWidth: '3ch', textAlign: 'center' }">{{ n }}</strong>
-    <button :style="btn" @click="n += step">+</button>
-  </div>
-</template>
-<script setup>
-import { ref } from 'vue';
+\`\`\`text sandbox=external
+https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js
+\`\`\`
+
+\`\`\`js sandbox=root 480x170 control=none code
+const { createApp, ref } = Vue;
 const step = knob(1, { min: 1, max: 10 });
-const n = ref(0);
 const box = { display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'center', height: '100%', font: '600 15px system-ui' };
 const btn = { font: 'inherit', fontSize: '20px', width: '38px', height: '38px', borderRadius: '8px', border: '1px solid currentColor', background: 'none', color: 'inherit', cursor: 'pointer' };
-</script>
+const app = createApp({
+  setup: () => ({ n: ref(0), step, box, btn }),
+  template: \`
+    <div :style="box">
+      <button :style="btn" @click="n -= step">-</button>
+      <strong :style="{ fontSize: '28px', minWidth: '3ch', textAlign: 'center' }">{{ n }}</strong>
+      <button :style="btn" @click="n += step">+</button>
+    </div>\`,
+});
+app.mount(root);
+onCleanup(() => app.unmount());
 \`\`\`
 
-
-\`\`\`sandbox=vue label=StatChip
-<template>
-  <span :style="chip"><slot /></span>
-</template>
-<script setup>
-const chip = {
-  font: '600 13px system-ui',
-  padding: '6px 12px',
-  borderRadius: '999px',
-  border: '1px solid currentColor',
+\`\`\`js sandbox label=StatChip
+const StatChip = {
+  template: '<span style="font:600 13px system-ui;padding:6px 12px;border-radius:999px;border:1px solid currentColor"><slot /></span>',
 };
-</script>
 \`\`\`
 
-\`\`\`sandbox=vue viz 480x120 code
-<template>
-  <div :style="row">
-    <StatChip v-for="w in words" :key="w">{{ w }}</StatChip>
-  </div>
-</template>
-<script setup>
-const words = ['source', 'external', 'viz'];
-const row = { display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center', height: '100%' };
-</script>
+\`\`\`js sandbox=root 480x120 control=none code
+const app = Vue.createApp({
+  components: { StatChip },
+  setup: () => ({ words: ['source', 'external', 'canvas'] }),
+  template: '<div style="display:flex;gap:10px;align-items:center;justify-content:center;height:100%"><StatChip v-for="w in words" :key="w">{{ w }}</StatChip></div>',
+});
+app.mount(root);
+onCleanup(() => app.unmount());
 \`\`\`
 `;
 

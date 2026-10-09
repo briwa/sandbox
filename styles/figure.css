@@ -217,6 +217,7 @@
   border-radius: 4px;
   padding: 0.22rem 0.28rem;
 }
+.sandbox-tag-text { font: 600 0.68rem/13px ui-monospace, monospace; }
 .sandbox-lib-label {
   max-width: min(34ch, 100%);
   overflow: hidden;

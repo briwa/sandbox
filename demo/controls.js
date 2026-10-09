@@ -16,7 +16,7 @@ const WAVE = `loop((t) => {
 });`;
 
 const sample = (control, extra = '') =>
-  '```sandbox=js viz 460x150 control=' + control + (extra ? ' ' + extra : '') + '\n' + WAVE + '\n```';
+  '```js sandbox=canvas 460x150 control=' + control + (extra ? ' ' + extra : '') + '\n' + WAVE + '\n```';
 
 const source = `
 

@@ -2,22 +2,20 @@ import {
   parseMeta,
   describeSandboxBlock,
   buildSrcdoc,
-  buildVueSrcdoc,
   sandboxPreludeBlocks,
   sandboxExternals,
-  sandboxVueComponents,
   safeUrl,
   escapeAttr,
   escapeHtml,
 } from '../core/index.js';
-import { iconSvg, KIND_ICONS } from '../core/icons.js';
+import { iconSvg, iconTag, blockIcons } from '../core/icons.js';
 
 const copyButton = `<button class="sandbox-copy" type="button" title="Copy code" aria-label="Copy code">${iconSvg('copy')}</button>`;
 
-const libHead = (kind, label) =>
+const libHead = (kind, label, spec) =>
   `<div class="sandbox-stage sandbox-lib-head"><span class="sandbox-lib-label">${escapeHtml(label)}</span>` +
-  (KIND_ICONS[kind] ?? KIND_ICONS.source)
-    .map(([icon, title]) => `<span class="sandbox-lib-tag" title="${title}" aria-label="${title}">${iconSvg(icon, 13)}</span>`)
+  blockIcons(kind, spec)
+    .map(([icon, title]) => `<span class="sandbox-lib-tag" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}">${iconTag(icon, 13)}</span>`)
     .join('') +
   `</div>`;
 
@@ -71,7 +69,6 @@ export function remarkSandbox({ highlight, lazy = false } = {}) {
 
     const allBlocks = found.map(({ spec, code }) => ({ ...spec, code }));
     const externals = sandboxExternals(allBlocks);
-    const components = sandboxVueComponents(allBlocks);
     const prelude = sandboxPreludeBlocks(allBlocks);
 
     // A frame names a shared js block by its position in the prelude, so the page stamps
@@ -92,7 +89,7 @@ export function remarkSandbox({ highlight, lazy = false } = {}) {
             type: 'html',
             value:
               `<figure class="sandbox sandbox-lib" data-kind="${kind}"${source} data-mode="${spec.open ? 'code' : 'preview'}">` +
-              libHead(kind, label) +
+              libHead(kind, label, spec) +
               `<div class="sandbox-code">${body}</div>` +
               `<div class="sandbox-tools">` +
               (kind === 'external' ? '' : copyButton) +
@@ -103,11 +100,7 @@ export function remarkSandbox({ highlight, lazy = false } = {}) {
           return;
         }
 
-        const srcdoc = escapeAttr(
-          spec.lang === 'vue'
-            ? buildVueSrcdoc(spec, code, { externals, components })
-            : buildSrcdoc(spec, code, prelude, externals)
-        );
+        const srcdoc = escapeAttr(buildSrcdoc(spec, code, prelude, externals));
         const codeHtml = spec.showCode ? await highlightCode(code, spec.lang) : '';
         const html =
 
@@ -155,7 +148,7 @@ export function remarkStripHtml() {
 // replaced; the editor's highlighter parses anything unfamiliar as JavaScript, and
 // Python coloured by JavaScript's rules is worse than Python left plain. In Astro the
 // site's own shiki already does this for every language, so the integration skips it.
-export const HIGHLIGHTED_LANGS = ['js', 'javascript', 'vue'];
+export const HIGHLIGHTED_LANGS = ['js', 'javascript'];
 
 export function remarkHighlightFences({ highlight, languages = HIGHLIGHTED_LANGS } = {}) {
   const known = new Set(languages.map((l) => l.toLowerCase()));

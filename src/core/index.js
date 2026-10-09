@@ -1,7 +1,7 @@
 export * from './protocol.js';
 export * from './icons.js';
 
-const PRESETS = new Set(['canvas', 'svg', 'root']);
+const PRESETS = new Set(['canvas', 'root']);
 const DEFAULT_W = 640;
 const DEFAULT_H = 360;
 
@@ -87,10 +87,9 @@ export { DEFAULT_W, DEFAULT_H };
 // The two axes an author actually picks: the language, and whether it is visualized.
 // `viz: ''` is a shared-source block; anything else is a figure on that surface.
 export function specToToolbar(spec = {}) {
-  const lang = spec.lang === 'vue' ? 'vue' : 'js';
   return {
-    lang,
-    viz: spec.kind === 'figure' ? (lang === 'vue' ? 'root' : spec.preset || 'canvas') : '',
+    lang: spec.lang || 'js',
+    viz: spec.kind === 'figure' ? spec.preset || 'canvas' : '',
     w: spec.w || DEFAULT_W,
     h: spec.h || DEFAULT_H,
     bg: spec.bg || '',
@@ -99,20 +98,19 @@ export function specToToolbar(spec = {}) {
     control: normalizeControl(spec.control),
     idle: spec.idle || 0,
     meta: spec.meta || '',
-    label: spec.componentName || spec.label || '',
+    label: spec.label || '',
   };
 }
 
-// What `viz` can be set to for a language: vue only ever mounts into a root.
-export const VIZ_SURFACES = { js: ['canvas', 'svg', 'root'], vue: ['root'] };
+// The surfaces a figure can draw on.
+export const VIZ_SURFACES = ['canvas', 'root'];
 
 // The toolbar state a fresh block opens with: a shared js block, sized like a figure would
 // be. Pass whatever should differ — `{ viz: 'canvas', w: 800, h: 400 }` opens on a canvas
 // of that size — and the rest fills in, so a host never has to spell out the whole shape.
 export function defaultToolbar(overrides = {}) {
-  const lang = overrides.lang === 'vue' ? 'vue' : 'js';
   const state = {
-    lang,
+    lang: 'js',
     viz: '',
     w: DEFAULT_W,
     h: DEFAULT_H,
@@ -126,9 +124,8 @@ export function defaultToolbar(overrides = {}) {
     code: '',
     ...overrides,
   };
-  state.lang = lang;
-  // `viz: true` is the shorthand for "visualize it", on the language's first surface.
-  if (state.viz === true || (state.viz && !VIZ_SURFACES[lang].includes(state.viz))) state.viz = VIZ_SURFACES[lang][0];
+  // `viz: true` is the shorthand for "visualize it", on the first surface.
+  if (state.viz === true || (state.viz && !VIZ_SURFACES.includes(state.viz))) state.viz = VIZ_SURFACES[0];
   return state;
 }
 
@@ -184,15 +181,11 @@ export function describeSandboxBlock(spec = {}) {
     return { kind: 'external', label, detail: detailOf(label, 'external library') };
   }
   if (spec.kind === 'source') {
-    if (spec.lang === 'vue') {
-      const label = spec.componentName || spec.label || 'vue component';
-      return { kind: 'vue', label, detail: detailOf(label, 'vue component') };
-    }
     const label = spec.label || named || 'shared source';
     return { kind: 'source', label, detail: detailOf(label, 'shared source') };
   }
 
-  const type = spec.lang === 'vue' ? 'vue' : spec.preset || 'canvas';
+  const type = spec.preset || 'canvas';
   const size = `${type} ${spec.w || DEFAULT_W}×${spec.h || DEFAULT_H}`;
   const label = spec.label || named || size;
   return { kind: 'figure', label, detail: detailOf(label, size) };
@@ -200,25 +193,23 @@ export function describeSandboxBlock(spec = {}) {
 
 const metaValue = (v) => (/[\s"]/.test(v) ? `"${escapeAttr(v)}"` : v);
 
-export function serializeSandboxMeta({ kind = 'figure', type, w, h, bg, showCode, open, control, idle, meta, label, componentName }) {
-  if (kind === 'external') return { lang: 'sandbox=external', meta: label ? `label=${metaValue(label)}` : '' };
+export function serializeSandboxMeta({ kind = 'figure', lang: language, type, w, h, bg, showCode, open, control, idle, meta, label }) {
+  if (kind === 'external') return { lang: language || 'text', meta: ['sandbox=external', label && `label=${metaValue(label)}`].filter(Boolean).join(' ') };
 
-  const isVue = type === 'vue';
-  const lang = isVue ? 'sandbox=vue' : 'sandbox=js';
+  const lang = language || 'js';
 
   if (kind === 'source') {
-    const name = isVue ? componentName || label : label;
-    const tokens = [open && 'open', name && `label=${metaValue(name)}`].filter(Boolean);
+    const tokens = ['sandbox', open && 'open', label && `label=${metaValue(label)}`].filter(Boolean);
     return { lang, meta: tokens.join(' ') };
   }
 
-  const tokens = [isVue || !type || type === 'canvas' ? 'viz' : `viz=${type}`];
+  const tokens = [`sandbox=${VIZ_SURFACES.includes(type) ? type : 'canvas'}`];
   if (w && h && !(Number(w) === DEFAULT_W && Number(h) === DEFAULT_H)) tokens.push(`${w}x${h}`);
   if (bg) tokens.push(`bg=${metaValue(bg)}`);
   if (open) tokens.push('open');
   else if (showCode) tokens.push('code');
-  if (control && control !== 'default' && !isVue) tokens.push(`control=${control}`);
-  if (idle && !isVue) tokens.push(`idle=${Math.max(0, Number(idle) || 0)}`);
+  if (control && control !== 'default') tokens.push(`control=${control}`);
+  if (idle) tokens.push(`idle=${Math.max(0, Number(idle) || 0)}`);
   if (meta) tokens.push(`meta=${metaValue(meta)}`);
   if (label) tokens.push(`label=${metaValue(label)}`);
   return { lang, meta: tokens.join(' ') };
@@ -228,14 +219,6 @@ export function buildSandboxFence(state, code) {
   const { lang, meta } = serializeSandboxMeta(state);
   const head = meta ? `${lang} ${meta}` : lang;
   return '```' + head + '\n' + (code || '') + '\n```';
-}
-
-let VUE_SRC = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.runtime.global.prod.js';
-let SFC_LOADER_SRC = 'https://cdn.jsdelivr.net/npm/vue3-sfc-loader@0.9/dist/vue3-sfc-loader.js';
-
-export function configureVueRuntime({ vue, sfcLoader } = {}) {
-  if (vue) VUE_SRC = vue;
-  if (sfcLoader) SFC_LOADER_SRC = sfcLoader;
 }
 
 export const escapeAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -257,31 +240,37 @@ function tokenizeMeta(meta) {
   return { flags, values, has: (k) => flags.has(k) || k in values };
 }
 
-// ```sandbox=js              shared source, pooled into every figure in the document
-// ```sandbox=js viz           a figure — `viz=svg` / `viz=root` pick the surface
-// ```sandbox=js viz idle=2000  a figure that sits at 2s in until it is played
-// ```sandbox=js viz open      a figure that starts on its code — `open` also unfolds a shared source
-// ```sandbox=vue label=Name   a component every vue figure can render
-// ```sandbox=external         https .js URLs, one per line — `label=Name` overrides the derived name
+// ```js sandbox                shared source, pooled into every figure in the document
+// ```js sandbox=canvas         a figure — `sandbox=root` swaps the canvas for a div
+// ```vue sandbox=root          the fence's language only picks the highlighting; the code runs as JS
+// ```js sandbox=canvas idle=2000  a figure that sits at 2s in until it is played
+// ```js sandbox=canvas open    a figure that starts on its code — `open` also unfolds a shared source
+// ```text sandbox=external     https .js URLs, one per line — `label=Name` overrides the derived name
 // Anything else — plain ```js, ```vue — is an ordinary code block we never touch.
-export function parseMeta(lang, meta) {
-  const dialect = /^sandbox=(js|vue|external)$/.exec((lang || '').trim())?.[1];
-  if (!dialect) return null;
+const ROLES = new Set(['source', 'external', ...PRESETS]);
 
-  const { flags, values, has } = tokenizeMeta(meta);
+export function parseMeta(lang, meta) {
+  let fence = (lang || '').trim();
+  let info = meta || '';
+  // A fence with no language in front: the sandbox token is all there is, and it runs as js.
+  if (/^sandbox(=|$)/.test(fence)) {
+    info = `${fence} ${info}`;
+    fence = '';
+  }
+
+  const { flags, values, has } = tokenizeMeta(info);
+  if (!has('sandbox')) return null;
+  const role = values.sandbox || 'source';
+  if (!ROLES.has(role)) return null;
+
   const label = values.label || '';
   // A CDN URL usually names itself, but a raw gist is a hash: `label` is the way out.
-  if (dialect === 'external') return { kind: 'external', lang: 'external', label };
-  const isVue = dialect === 'vue';
+  if (role === 'external') return { kind: 'external', lang: fence || 'text', label };
 
+  const language = fence.toLowerCase() || 'js';
   const open = flags.has('open');
 
-  if (!has('viz')) {
-    if (!isVue) return { kind: 'source', lang: 'js', label, open };
-    // A Vue SFC carries no name of its own, so `label` doubles as the tag to register under.
-    const componentName = /^[A-Z][\w-]*$/.test(label) ? label : '';
-    return { kind: 'source', lang: 'vue', componentName, label, open };
-  }
+  if (role === 'source') return { kind: 'source', lang: language, label, open };
 
   const size = [...flags].find((t) => /^\d+x\d+$/.test(t));
   const [w, h] = size ? size.split('x').map(Number) : [DEFAULT_W, DEFAULT_H];
@@ -289,19 +278,17 @@ export function parseMeta(lang, meta) {
   const showCode = open || flags.has('code');
   const metaText = values.meta || '';
 
-  if (isVue) return { kind: 'figure', lang: 'vue', preset: 'root', w, h, showCode, open, bg, label, meta: metaText };
-
-  const preset = PRESETS.has(values.viz) ? values.viz : 'canvas';
+  const preset = role;
   const control = normalizeControl(values.control);
   const idle = Math.max(0, Number(values.idle) || 0);
 
-  return { kind: 'figure', lang: 'js', preset, w, h, showCode, open, bg, control, idle, label, meta: metaText };
+  return { kind: 'figure', lang: language, preset, w, h, showCode, open, bg, control, idle, label, meta: metaText };
 }
 
 // The shared js blocks in page order, each with the name the page shows it under, so an
 // error thrown inside the prelude can be pinned to a block instead of "somewhere shared".
 export function sandboxPreludeBlocks(blocks) {
-  const shared = (blocks || []).filter((b) => b.kind === 'source' && b.lang === 'js');
+  const shared = (blocks || []).filter((b) => b.kind === 'source');
   return shared.map((b, i) => {
     const { label } = describeSandboxBlock(b);
     return {
@@ -352,69 +339,6 @@ export function sandboxExternals(blocks) {
     .filter(Boolean);
 }
 
-export function sandboxVueComponents(blocks) {
-  return (blocks || [])
-    .filter((b) => b.kind === 'source' && b.lang === 'vue' && b.componentName)
-    .map((b) => ({ name: b.componentName, code: b.code }));
-}
-
-export const escapeTemplate = (s) =>
-  '`' +
-  String(s == null ? '' : s)
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$\{/g, '\\${')
-    .replace(/<\/script>/gi, '<\\/script>') +
-  '`';
-
-export function buildVueSrcdoc({ w, h, bg }, code, { externals = [], components = [], console: captureConsole = false, knobs } = {}) {
-
-  const fetched = (externals || []).filter(isRawGistUrl);
-  const ext = (externals || [])
-    .filter((u) => !isRawGistUrl(u))
-    .map((u) => `<script src="${u}"></script>`)
-    .join('');
-  const bgCss = bg ? `body{background:${bg}}` : themeBgCss;
-  const rootCss = `#root{position:relative;width:${w}px;height:${h}px;max-width:100%;margin-inline:auto}`;
-
-  const css = `html,body{margin:0;overflow:hidden}${bgCss}${rootCss}canvas,svg{display:block;max-width:100%;height:auto;margin-inline:auto}.err{color:#c0392b;white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;padding:.75rem}`;
-
-  const files = [
-    ...components.map((c) => `${JSON.stringify('/' + c.name + '.vue')}:${escapeTemplate(nameKnobs(c.code))}`),
-    `${JSON.stringify('/__main__.vue')}:${escapeTemplate(nameKnobs(code))}`,
-  ].join(',');
-
-  const regs = components
-    .map((c) => `app.component(${JSON.stringify(c.name)},await loadModule(${JSON.stringify('/' + c.name + '.vue')},opts));`)
-    .join('');
-
-  // A knob change remounts the app: `<script setup>` runs again and reads the new values.
-  const script =
-    VIS_GATE +
-    knobRuntime(knobs) +
-    HELLO +
-    `let __rerun=()=>{};` +
-    `const root=document.querySelector('#root');` +
-    `const report=()=>parent.postMessage({__sandboxHeight:document.body.scrollHeight},'*');` +
-    `new ResizeObserver(report).observe(document.documentElement);` +
-    (bg ? '' : themeBgListener) +
-    `const __files={${files}};` +
-    `const opts={moduleCache:{vue:Vue},getFile(u){const f=__files[u];if(f==null)throw new Error('file not found: '+u);return Promise.resolve(f)},addStyle(t){const s=document.createElement('style');s.textContent=t;document.head.appendChild(s)}};` +
-    `const {loadModule}=window['vue3-sfc-loader'];` +
-    (fetched.length
-      ? `const __fx=[${fetched.map((u) => JSON.stringify(u)).join(',')}];` +
-        `const __loadExt=async()=>{for(const u of __fx){const r=await fetch(u);if(!r.ok)throw new Error('external '+u+' failed: HTTP '+r.status);const s=document.createElement('script');s.textContent=await r.text();document.head.appendChild(s)}};`
-      : `const __loadExt=async()=>{};`) +
-    FMT_ERR +
-    `const __fail=(e)=>{window.__sbxDead=true;const m=__fmt(e);document.body.innerHTML='<pre class=err>'+__esc(m)+'</pre>';window.__sbxFlushConsole&&__sbxFlushConsole();window.__sbxErr={message:m};parent.postMessage({__sandboxError:window.__sbxErr},'*')};` +
-    `(async()=>{try{await __loadExt();const __comp=await loadModule('/__main__.vue',opts);let app=null;` +
-      `const __mount=async()=>{__knobDefs=[];__knobN=0;app=Vue.createApp(__comp);${regs}app.mount(root);__knobReport()};` +
-      `__rerun=async()=>{if(!app||window.__sbxDead)return;try{app.unmount();await __mount()}catch(e){__fail(e)}};` +
-      `await __mount()}catch(e){__fail(e)}report()})();`;
-
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>${consoleScript(captureConsole)}</head><body><div id="root"></div>${ext}<script src="${VUE_SRC}"></script><script src="${SFC_LOADER_SRC}"></script><script>${script}</script></body></html>`;
-}
-
 // `prelude` is the array `sandboxPreludeBlocks` gives, or a plain string for callers that
 // pooled the source themselves; the string form loses the per-block names in errors.
 export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: captureConsole, knobs }, code, prelude = '', externals = []) {
@@ -451,14 +375,10 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const canPause = isCanvas && (mode === 'default' || mode === 'autoplay') && !isHover;
   const surface = isCanvas
     ? '<canvas></canvas>'
-    : isRoot
-      ? '<div id="root"></div>'
-      : `<svg viewBox="0 0 ${w} ${h}"></svg>`;
+    : '<div id="root"></div>';
   const setup = isCanvas
     ? `const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d'),width=canvas.width=${w},height=canvas.height=${h};`
-    : isRoot
-      ? `const root=document.querySelector('#root'),width=${w},height=${h};`
-      : `const svg=document.querySelector('svg'),width=${w},height=${h};`;
+    : `const root=document.querySelector('#root'),width=${w},height=${h};`;
 
   const fetched = (externals || []).filter(isRawGistUrl);
   const ext = (externals || [])
@@ -466,7 +386,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     .map((u) => `<script src="${u}"></script>`)
     .join('');
 
-  const deferred = (isCanvas || isRoot) && mode === 'default' && !isHover;
+  const deferred = mode === 'default' && !isHover;
   const playBtn = deferred
     ? `<button id="__play" type="button" aria-label="Run figure"><svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true"><polygon points="38,28 38,72 74,50" fill="currentColor"/></svg></button>`
     : '';
@@ -492,8 +412,8 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     : '';
 
   const media = isHover
-    ? `html,body{height:100%}canvas,svg{display:block;width:100%;height:100%}`
-    : `canvas,svg{display:block;max-width:100%;height:auto;margin-inline:auto}`;
+    ? `html,body{height:100%}canvas{display:block;width:100%;height:100%}`
+    : `canvas{display:block;max-width:100%;height:auto;margin-inline:auto}`;
 
   const css = `html,body{margin:0;overflow:hidden}${bgCss}${rootCss}${media}.err{color:#c0392b;white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;padding:.75rem}.err a{color:inherit;text-decoration:underline}${playCss}${ctlCss}`;
 
@@ -503,9 +423,9 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     : `const start=run;`;
 
   // Everything but a hover figure can be torn down and run again: that is what reset, and a
-  // knob change, do. svg has no loop to stop, but its drawing still has to be cleared.
+  // knob change, do. A root has no loop to stop, but what it drew still has to be cleared.
   const resettable = !isHover;
-  const clearSurface = isCanvas ? 'canvas.width=width' : isRoot ? "root.innerHTML=''" : "svg.innerHTML=''";
+  const clearSurface = isCanvas ? 'canvas.width=width' : "root.innerHTML=''";
   // The loops that keep their own clock, so a re-run can pick up where they were.
   const timed = canPause || isManual;
 

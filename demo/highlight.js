@@ -1,6 +1,5 @@
 import { tagHighlighter, tags as t, highlightTree } from '@lezer/highlight';
 import { javascriptLanguage } from '@codemirror/lang-javascript';
-import { vueLanguage } from '@codemirror/lang-vue';
 
 const highlighter = tagHighlighter([
   { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], class: 'sbx-tok-comment' },
@@ -20,7 +19,6 @@ const highlighter = tagHighlighter([
 const LANGUAGES = {
   js: javascriptLanguage,
   javascript: javascriptLanguage,
-  vue: vueLanguage,
 };
 
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

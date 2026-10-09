@@ -20,22 +20,27 @@ export const ICONS = {
   format: '<path d="M3 6h18M3 12h12M3 18h16"/>',
   code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
   codeOff: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/><path d="m3 3 18 18"/>',
-  vue: '<path d="M3 4h4l5 9 5-9h4L12 21 3 4z"/>',
   canvas: '<rect x="4" y="3" width="16" height="12" rx="1"/><path d="M12 1v2M8 15l-3 7M16 15l3 7M12 15v4"/>',
-  svg: '<path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>',
   root: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="2"/>',
 };
 
 export const KIND_ICONS = {
   source: [['file', 'shared source'], ['js', 'js']],
-  vue: [['file', 'shared source'], ['vue', 'vue component']],
   external: [['globe', 'external library']],
 };
 
 // A block's icon tags as `[icon, title]` pairs, by its `describeSandboxBlock` kind: a figure's
-// language and surface, or its kind's fixed pair.
-export const blockIcons = (kind, block) =>
-  kind === 'figure' ? [[block.lang, block.lang], [block.preset, block.preset]] : KIND_ICONS[kind] ?? KIND_ICONS.source;
+// language and surface, a shared block's language, or its kind's fixed pair.
+export const blockIcons = (kind, block) => {
+  const lang = block?.lang || 'js';
+  if (kind === 'figure') return [[lang, lang], [block.preset, block.preset]];
+  if (kind === 'source') return [['file', 'shared source'], [lang, lang]];
+  return KIND_ICONS[kind] ?? KIND_ICONS.source;
+};
+
+// A language with no icon of its own shows its name instead.
+export const iconTag = (name, size = 15) =>
+  ICONS[name] ? iconSvg(name, size) : `<span class="sandbox-tag-text">${String(name).replace(/[&<>"]/g, '')}</span>`;
 
 export const iconSvg = (name, size = 15) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
