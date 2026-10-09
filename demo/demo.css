@@ -10,8 +10,7 @@ body {
   margin: 0;
 }
 
-/* One bar across the top, identical on every tab — the title on the left, the tabs on the
-   right — so switching tabs never moves it. */
+/* One bar across the top with the title. */
 .demo-header {
   height: 2.6rem;
   box-sizing: border-box;
@@ -23,28 +22,12 @@ body {
   border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
 }
 
-nav {
-  display: flex;
-  gap: 1rem;
-  align-items: baseline;
-  font-size: 0.8rem;
-}
-
-nav a {
-  color: inherit;
-}
-
-nav [aria-current='page'] {
-  text-decoration: none;
-  opacity: 0.5;
-}
-
 h1 {
   font-size: 0.9rem;
   margin: 0;
 }
 
-/* One tab's contents. Inactive panels stay in the DOM so a revisited tab keeps its state. */
+/* The page's single column. */
 .panel {
   display: flex;
   flex-direction: column;
@@ -55,14 +38,8 @@ h1 {
   padding-inline: 1rem;
 }
 
-.panel[hidden] {
-  display: none;
-}
-
 h2 {
   font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   opacity: 0.5;
   margin: 0 0 0.5rem;
 }
@@ -128,7 +105,7 @@ select {
   margin: 2.75rem 0 0.6rem;
 }
 
-.prose > :first-child {
+.panel > :first-child > :first-child {
   margin-top: 0;
 }
 

@@ -1,5 +1,3 @@
-import '@briwa.dev/sandbox/styles';
-import './demo.css';
 import { playFigure, pauseFigure, resetFigure } from '@briwa.dev/sandbox/client';
 import { renderMarkdown } from './render.js';
 
@@ -15,53 +13,47 @@ const WAVE = `loop((t) => {
   }
 });`;
 
-const sample = (control, extra = '') =>
-  '```js sandbox=canvas 460x150 control=' + control + (extra ? ' ' + extra : '') + '\n' + WAVE + '\n```';
+const MODES = [
+  ['default'],
+  ['autoplay'],
+  ['none'],
+  ['hover'],
+  ['manual'],
+  ['default', 'idle=2000'],
+  ['hover', 'idle=2000'],
+];
 
-const source = `
-
-## default - starts off paused
-
-${sample('default')}
-
-## autoplay - runs on its own
-
-${sample('autoplay')}
-
-## none - uncontrollable
-
-${sample('none')}
-
-## hover - runs while pointed at
-
-${sample('hover')}
-
-## manual - the page drives it
-
-Controlled by \`playFigure\`, \`pauseFigure\` and \`resetFigure\` from \`@briwa.dev/sandbox/client\`
-
-${sample('manual')}
-
-## idle
-
-\`idle=<t in ms>\` parks the figure at a given time, and defines the reset point.
-
-${sample('default', 'idle=2000')}
-
-${sample('hover', 'idle=2000')}
-`;
+const sample = (control, extra) =>
+  '```js sandbox=canvas 460x150 code control=' + control + (extra ? ' ' + extra : '') + '\n' + WAVE + '\n```';
 
 const mount = document.querySelector('#controls-prose');
-mount.innerHTML = await renderMarkdown(source);
 
-const manual = mount.querySelector(".sandbox[data-control='manual']");
-const bar = document.createElement('div');
-bar.className = 'manual-controls';
-for (const [text, action] of [['play', playFigure], ['pause', pauseFigure], ['reset', resetFigure]]) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.textContent = text;
-  btn.addEventListener('click', () => action(manual));
-  bar.append(btn);
+const heading = Object.assign(document.createElement('h2'), { textContent: 'controls' });
+
+const picker = document.createElement('select');
+picker.setAttribute('aria-label', 'Control mode');
+MODES.forEach(([control, extra], i) => picker.add(new Option(extra ? `${control} ${extra}` : control, i)));
+
+const stage = document.createElement('div');
+mount.append(heading, picker, stage);
+
+async function render() {
+  const [control, extra] = MODES[picker.value];
+  stage.innerHTML = await renderMarkdown(sample(control, extra));
+  if (control !== 'manual') return;
+
+  const figure = stage.querySelector('.sandbox');
+  const bar = document.createElement('div');
+  bar.className = 'manual-controls';
+  for (const [text, action] of [['play', playFigure], ['pause', pauseFigure], ['reset', resetFigure]]) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = text;
+    btn.addEventListener('click', () => action(figure));
+    bar.append(btn);
+  }
+  figure.after(bar);
 }
-manual.after(bar);
+
+picker.addEventListener('change', render);
+await render();
