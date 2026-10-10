@@ -20,12 +20,12 @@ export const ICONS = {
   format: '<path d="M3 6h18M3 12h12M3 18h16"/>',
   code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
   codeOff: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/><path d="m3 3 18 18"/>',
-  canvas: '<rect x="4" y="3" width="16" height="12" rx="1"/><path d="M12 1v2M8 15l-3 7M16 15l3 7M12 15v4"/>',
+  canvas: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 12h18M3 7.5h4M3 16.5h4M17 7.5h4M17 16.5h4"/>',
   root: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="2"/>',
 };
 
 export const KIND_ICONS = {
-  source: [['file', 'shared source'], ['js', 'js']],
+  source: [['js', 'js']],
   external: [['globe', 'external library']],
 };
 
@@ -34,7 +34,7 @@ export const KIND_ICONS = {
 export const blockIcons = (kind, block) => {
   const lang = block?.lang || 'js';
   if (kind === 'figure') return [[lang, lang], [block.preset, block.preset]];
-  if (kind === 'source') return [['file', 'shared source'], [lang, lang]];
+  if (kind === 'source') return [[lang, lang]];
   return KIND_ICONS[kind] ?? KIND_ICONS.source;
 };
 
