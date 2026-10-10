@@ -67,6 +67,39 @@ const el = (tag, className, attrs = {}) => {
   return n;
 };
 
+// A press anywhere on a slider drags from its current value rather than jumping to the pointer.
+function relativeDrag(input) {
+  input.style.touchAction = 'pan-y';
+  input.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || input.disabled) return;
+    e.preventDefault();
+    input.focus({ preventScroll: true });
+    input.setPointerCapture(e.pointerId);
+    const min = Number(input.min);
+    const max = Number(input.max);
+    const start = Number(input.value);
+    const startX = e.clientX;
+    const perPx = (max - min) / Math.max(1, input.getBoundingClientRect().width - 16);
+    let moved = false;
+    const move = (ev) => {
+      const prev = input.value;
+      input.value = String(Math.max(min, Math.min(max, start + (ev.clientX - startX) * perPx)));
+      if (input.value === prev) return;
+      moved = true;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const end = () => {
+      input.removeEventListener('pointermove', move);
+      input.removeEventListener('pointerup', end);
+      input.removeEventListener('pointercancel', end);
+      if (moved) input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    input.addEventListener('pointermove', move);
+    input.addEventListener('pointerup', end);
+    input.addEventListener('pointercancel', end);
+  });
+}
+
 function knobRow(d, onChange) {
   const row = el('label', 'sandbox-knob');
   row.dataset.type = d.type;
@@ -101,6 +134,7 @@ function knobRow(d, onChange) {
     const slider = ranged(d);
     input = el('input', '', { type: slider ? 'range' : 'number', min: d.min, max: d.max, step: stepOf(d) });
     input.value = String(cur);
+    if (slider) relativeDrag(input);
     const out = slider ? el('output') : null;
     if (out) {
       out.style.minWidth = `${readoutWidth(d)}ch`;
@@ -128,6 +162,7 @@ function knobRow(d, onChange) {
     const show = (c) => { swatch.style.background = rgbCss(c); swatch.title = rgbHex(c); };
     const place = (c) => { input.value = String(rgbPosition(d, c)); show(c); };
     place(cur);
+    relativeDrag(input);
     input.addEventListener('input', () => {
       const c = mixRgb(d, Number(input.value));
       show(c);
