@@ -83,15 +83,26 @@ export function watchFigureVisibility(frames) {
       io.observe(f);
     }
   };
-  const onPage = () => { for (const f of frames()) send(f); };
+  // After sleep, focus can return to a frame without `focus` firing here, so a visible, unfocused page keeps checking.
+  let recheck = null;
+  const onPage = () => {
+    for (const f of frames()) send(f);
+    clearInterval(recheck);
+    recheck = document.visibilityState === 'visible' && !document.hasFocus()
+      ? setInterval(() => { if (document.hasFocus()) onPage(); }, 500)
+      : null;
+  };
   document.addEventListener('visibilitychange', onPage);
   window.addEventListener('focus', onPage);
   window.addEventListener('blur', onPage);
+  window.addEventListener('pageshow', onPage);
   sync();
   return {
     sync,
     send,
     stop() {
+      clearInterval(recheck);
+      window.removeEventListener('pageshow', onPage);
       io.disconnect();
       document.removeEventListener('visibilitychange', onPage);
       window.removeEventListener('focus', onPage);
