@@ -15,6 +15,7 @@
     "./client": "./dist/client/index.js",
     "./remark": "./dist/remark/index.js",
     "./markdown": "./dist/markdown/index.js",
+    "./post": "./dist/post/index.js",
     "./astro": "./dist/astro/index.js",
     "./styles": "./styles/all.css",
     "./styles/figure.css": "./styles/figure.css",
