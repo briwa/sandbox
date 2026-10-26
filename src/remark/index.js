@@ -24,7 +24,13 @@ const codeToggle = (showing) =>
     ? `<button class="sandbox-toggle" type="button" title="Hide code" aria-label="Hide code">${iconSvg('codeOff')}</button>`
     : `<button class="sandbox-toggle" type="button" title="Show code" aria-label="Show code">${iconSvg('code')}</button>`;
 
-const plainHighlight = (code) => `<pre class="astro-code"><code>${escapeHtml(code)}</code></pre>`;
+// `expand` lets a figure squeezed into a column open over the whole page at its own size,
+// and from there go fullscreen. Both need mountFigures on the page.
+const viewButtons =
+  `<button class="sandbox-fullscreen" type="button" title="Fullscreen" aria-label="Fullscreen">${iconSvg('fullscreen')}</button>` +
+  `<button class="sandbox-expand" type="button" title="Expand figure" aria-label="Expand figure">${iconSvg('expand')}</button>`;
+
+const plainHighlight =(code) => `<pre class="astro-code"><code>${escapeHtml(code)}</code></pre>`;
 
 const externalUrlList = (code) => {
   const urls = (code || '').split(/\s+/).map(safeUrl).filter(Boolean);
@@ -106,20 +112,23 @@ export function remarkSandbox({ highlight, lazy = false } = {}) {
 
           `<figure class="sandbox" data-mode="${spec.open ? 'code' : 'preview'}" data-preset="${spec.preset}"` +
           (spec.control ? ` data-control="${spec.control}"` : '') +
-          ` style="--sandbox-h:${spec.h}px;--sandbox-ar:${spec.w}/${spec.h}">` +
+          ` style="--sandbox-w:${spec.w}px;--sandbox-h:${spec.h}px;--sandbox-ar:${spec.w}/${spec.h}">` +
 
           `<div class="sandbox-stage"><iframe class="sandbox-frame" sandbox="allow-scripts" title="interactive ${spec.preset} figure" ${lazy ? 'data-srcdoc' : 'srcdoc'}="${srcdoc}"></iframe>` +
           // A frame swallows the pointer: neither page sees it enter or leave. This catches
           // it in the host document instead, which is where the hover wiring lives.
           (spec.control === 'hover' ? `<div class="sandbox-hover" aria-hidden="true"></div>` : '') +
           `</div>` +
-          (spec.showCode
-            ? `<div class="sandbox-code">${codeHtml}</div>` +
-              `<div class="sandbox-tools">` +
-              copyButton +
-              (spec.open
-                ? `<button class="sandbox-toggle" type="button" title="Show preview" aria-label="Show preview">${iconSvg('eye')}</button>`
-                : codeToggle(false)) +
+          (spec.showCode ? `<div class="sandbox-code">${codeHtml}</div>` : '') +
+          (spec.showCode || spec.expand
+            ? `<div class="sandbox-tools">` +
+              (spec.showCode
+                ? copyButton +
+                  (spec.open
+                    ? `<button class="sandbox-toggle" type="button" title="Show preview" aria-label="Show preview">${iconSvg('eye')}</button>`
+                    : codeToggle(false))
+                : '') +
+              (spec.expand ? viewButtons : '') +
               `</div>`
             : '') +
           `</figure>`;

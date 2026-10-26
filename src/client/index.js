@@ -1,4 +1,4 @@
-import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KNOBS, MSG_HELLO, MSG_GOTO, MSG_PRESS } from '../core/protocol.js';
+import { MSG_BG, MSG_HEIGHT, MSG_VISIBLE, MSG_PLAY, MSG_PAUSE, MSG_RESET, MSG_KNOBS, MSG_HELLO, MSG_GOTO, MSG_PRESS, MSG_FILL } from '../core/protocol.js';
 import { iconSvg } from '../core/icons.js';
 import { attachFigureKnobs, toggleFigureKnobs, closeFigureKnobs, knobMessage, knobResetMessage } from './knobs.js';
 
@@ -211,6 +211,41 @@ const setBtn = (btn, icon, label) => {
   btn.setAttribute('aria-label', label);
 };
 
+// Opens a figure over the whole page at its own size, or puts it back. Leaving also leaves
+// fullscreen, which only ever happens from inside the expanded view.
+export function expandFigure(fig, on) {
+  if (!fig) return;
+  const next = on === undefined ? !fig.hasAttribute('data-expanded') : Boolean(on);
+  if (!next && document.fullscreenElement === fig) document.exitFullscreen?.().catch(() => {});
+  fig.toggleAttribute('data-expanded', next);
+  const btn = fig.querySelector('.sandbox-expand');
+  if (btn) setBtn(btn, next ? 'close' : 'expand', next ? 'Close' : 'Expand figure');
+  const fs = fig.querySelector('.sandbox-fullscreen');
+  if (fs) fs.hidden = !document.fullscreenEnabled;
+}
+
+export function fullscreenFigure(fig, on) {
+  if (!fig || !document.fullscreenEnabled) return;
+  const next = on === undefined ? document.fullscreenElement !== fig : Boolean(on);
+  if (next) {
+    expandFigure(fig, true);
+    fig.requestFullscreen().catch(() => {});
+  } else if (document.fullscreenElement === fig) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+// Fullscreen is where a canvas grows past its own size to fill the screen; everywhere else
+// it keeps the size it was written for.
+const syncFullscreen = () => {
+  for (const btn of document.querySelectorAll('.sandbox-fullscreen')) {
+    const fig = btn.closest('.sandbox');
+    const on = document.fullscreenElement === fig;
+    setBtn(btn, on ? 'fullscreenExit' : 'fullscreen', on ? 'Exit fullscreen' : 'Fullscreen');
+    postToFigure(fig, { [MSG_FILL]: on });
+  }
+};
+
 export function mountFigures({
   root = document,
   selector = '.sandbox-frame',
@@ -271,6 +306,7 @@ export function mountFigures({
         vis.sync();
         syncHover?.();
         vis.send(f);
+        if (document.fullscreenElement && document.fullscreenElement === f.closest('.sandbox')) f.contentWindow.postMessage({ [MSG_FILL]: true }, '*');
       }
 
       // A hover figure is sized by its host, and the height it reports is just that box
@@ -312,6 +348,16 @@ export function mountFigures({
       toggleFigureKnobs(knobBtn.closest('.sandbox'));
       return;
     }
+    const expandBtn = e.target.closest('.sandbox-expand');
+    if (expandBtn) {
+      expandFigure(expandBtn.closest('.sandbox'));
+      return;
+    }
+    const fsBtn = e.target.closest('.sandbox-fullscreen');
+    if (fsBtn) {
+      fullscreenFigure(fsBtn.closest('.sandbox'));
+      return;
+    }
     const btn = e.target.closest('.sandbox-toggle');
     if (!btn) return;
     const fig = btn.closest('.sandbox');
@@ -345,6 +391,15 @@ export function mountFigures({
   };
   if (toggle) document.addEventListener('click', onToggle);
   document.addEventListener('pointerdown', clearHit);
+  document.addEventListener('fullscreenchange', syncFullscreen);
+
+  // Escape closes an open panel first, and only then the expanded figure under it.
+  const onEscape = (e) => {
+    if (e.key !== 'Escape') return;
+    const fig = scope()?.querySelector('.sandbox[data-expanded]');
+    if (fig && !fig.querySelector('.sandbox-knobs:not([hidden])')) expandFigure(fig, false);
+  };
+  document.addEventListener('keydown', onEscape, true);
 
   // A panel closes on a press anywhere else, or on Escape. A press on a frame arrives as a message.
   const onDown = (e) => closeFigureKnobs(e.target);
@@ -363,6 +418,8 @@ export function mountFigures({
       document.removeEventListener('keydown', onKey);
     }
     document.removeEventListener('pointerdown', clearHit);
+    document.removeEventListener('fullscreenchange', syncFullscreen);
+    document.removeEventListener('keydown', onEscape, true);
     clearHit();
     stopTheme();
     vis.stop();

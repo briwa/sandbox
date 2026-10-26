@@ -95,6 +95,7 @@ export function specToToolbar(spec = {}) {
     bg: spec.bg || '',
     showCode: Boolean(spec.showCode),
     open: Boolean(spec.open),
+    expand: Boolean(spec.expand),
     control: normalizeControl(spec.control),
     idle: spec.idle || 0,
     meta: spec.meta || '',
@@ -117,6 +118,7 @@ export function defaultToolbar(overrides = {}) {
     bg: '',
     showCode: false,
     open: false,
+    expand: false,
     control: 'default',
     idle: 0,
     meta: '',
@@ -193,7 +195,7 @@ export function describeSandboxBlock(spec = {}) {
 
 const metaValue = (v) => (/[\s"]/.test(v) ? `"${escapeAttr(v)}"` : v);
 
-export function serializeSandboxMeta({ kind = 'figure', lang: language, type, w, h, bg, showCode, open, control, idle, meta, label }) {
+export function serializeSandboxMeta({ kind = 'figure', lang: language, type, w, h, bg, showCode, open, expand, control, idle, meta, label }) {
   if (kind === 'external') return { lang: language || 'text', meta: ['sandbox=external', label && `label=${metaValue(label)}`].filter(Boolean).join(' ') };
 
   const lang = language || 'js';
@@ -208,6 +210,7 @@ export function serializeSandboxMeta({ kind = 'figure', lang: language, type, w,
   if (bg) tokens.push(`bg=${metaValue(bg)}`);
   if (open) tokens.push('open');
   else if (showCode) tokens.push('code');
+  if (expand) tokens.push('expand');
   if (control && control !== 'default') tokens.push(`control=${control}`);
   if (idle) tokens.push(`idle=${Math.max(0, Number(idle) || 0)}`);
   if (meta) tokens.push(`meta=${metaValue(meta)}`);
@@ -245,6 +248,7 @@ function tokenizeMeta(meta) {
 // ```vue sandbox=root          the fence's language only picks the highlighting; the code runs as JS
 // ```js sandbox=canvas idle=2000  a figure that sits at 2s in until it is played
 // ```js sandbox=canvas open    a figure that starts on its code — `open` also unfolds a shared source
+// ```js sandbox=canvas expand  a figure that can open over the whole page, and from there go fullscreen
 // ```text sandbox=external     https .js URLs, one per line — `label=Name` overrides the derived name
 // Anything else — plain ```js, ```vue — is an ordinary code block we never touch.
 const ROLES = new Set(['source', 'external', ...PRESETS]);
@@ -276,13 +280,14 @@ export function parseMeta(lang, meta) {
   const [w, h] = size ? size.split('x').map(Number) : [DEFAULT_W, DEFAULT_H];
   const bg = /^[#\w(),.%\s-]+$/.test(values.bg || '') ? values.bg : '';
   const showCode = open || flags.has('code');
+  const expand = flags.has('expand');
   const metaText = values.meta || '';
 
   const preset = role;
   const control = normalizeControl(values.control);
   const idle = Math.max(0, Number(values.idle) || 0);
 
-  return { kind: 'figure', lang: language, preset, w, h, showCode, open, bg, control, idle, label, meta: metaText };
+  return { kind: 'figure', lang: language, preset, w, h, showCode, open, expand, bg, control, idle, label, meta: metaText };
 }
 
 // The shared js blocks in page order, each with the name the page shows it under, so an
@@ -413,7 +418,10 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
 
   const media = isHover
     ? `html,body{height:100%}canvas{display:block;width:100%;height:100%}`
-    : `canvas{display:block;max-width:100%;height:auto;margin-inline:auto}`;
+    : `canvas{display:block;max-width:100%;height:auto;margin-inline:auto}html.__fill canvas{width:100%}`;
+  const fillSync = isCanvas && !isHover
+    ? `addEventListener('message',function(e){if(e.data&&'__sbxFill'in e.data)document.documentElement.classList.toggle('__fill',!!e.data.__sbxFill)});`
+    : '';
 
   const css = `html,body{margin:0;overflow:hidden}${bgCss}${rootCss}${media}.err{color:#c0392b;white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;padding:.75rem}.err a{color:inherit;text-decoration:underline}${playCss}${ctlCss}`;
 
@@ -529,6 +537,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
     rerun +
     `new ResizeObserver(report).observe(document.documentElement);` +
     themeSync +
+    fillSync +
     `const run=()=>{__ran=true;__knobDefs=[];__knobN=0;try{\n${pre}\n${body}\n}catch(e){showErr(__fmt(e),__pick(e&&e.stack));return}report();__knobReport()};` +
     loadExt +
     tail;

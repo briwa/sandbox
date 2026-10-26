@@ -43,6 +43,8 @@
 }
 .sandbox-toggle,
 .sandbox-copy,
+.sandbox-expand,
+.sandbox-fullscreen,
 .sandbox-tool-btn,
 .sandbox-knobs-btn {
   display: inline-flex;
@@ -58,10 +60,42 @@
 }
 .sandbox-toggle:hover,
 .sandbox-copy:hover,
+.sandbox-expand:hover,
+.sandbox-fullscreen:hover,
 .sandbox-tool-btn:hover,
 .sandbox-knobs-btn:hover,
 .sandbox-knobs-btn[aria-expanded='true'] { color: var(--sbx-ink); }
 .sandbox[data-mode='preview'] .sandbox-copy { display: none; }
+.sandbox:not([data-expanded]) .sandbox-fullscreen,
+.sandbox-fullscreen[hidden] { display: none; }
+
+/* Expanded, a figure covers the page at the size it was written for rather than the
+   column's: the stage is as wide as the figure asks, centred, and never stretched past it.
+   The tools stay pinned to the viewport corner while a tall figure scrolls under them. */
+html:has(.sandbox[data-expanded]) { overflow: hidden; }
+.sandbox[data-expanded] {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: auto;
+  margin: 0;
+  box-sizing: border-box;
+  padding: 3.25rem 1rem 1rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--sbx-surface);
+}
+.sandbox[data-expanded] > .sandbox-stage { width: min(100%, var(--sandbox-w, 100%)); margin-block: auto; }
+.sandbox[data-expanded] > .sandbox-code { width: min(100%, max(var(--sandbox-w, 0px), 48rem)); margin-block: auto; }
+.sandbox[data-expanded] > .sandbox-tools { position: fixed; top: 0.75rem; right: 0.75rem; z-index: 1; }
+.sandbox[data-expanded] > .sandbox-knobs { position: fixed; top: 3rem; right: 0.75rem; }
+/* Fullscreen is the one place a canvas grows past its own size: as large as the screen
+   holds at its proportions, below the tool corner. */
+.sandbox[data-preset='canvas']:fullscreen > .sandbox-stage {
+  width: min(100%, calc((100vh - 4.25rem) * var(--sandbox-ar)));
+}
 .sandbox[data-mode='code'] .sandbox-knobs-btn,
 .sandbox[data-mode='code'] .sandbox-knobs { display: none; }
 

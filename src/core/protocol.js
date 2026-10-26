@@ -25,3 +25,5 @@ export const MSG_KNOB = '__sbxKnob';
 // everything it has reported again: its height, its knobs, and the error it is showing.
 export const MSG_HELLO = '__sbxHello';
 export const MSG_PRESS = '__sbxPress';
+// The page asking a canvas figure to scale its canvas to the frame's width, as in fullscreen.
+export const MSG_FILL = '__sbxFill';
