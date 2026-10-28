@@ -97,7 +97,6 @@ export function specToToolbar(spec = {}) {
     open: Boolean(spec.open),
     expand: Boolean(spec.expand),
     control: normalizeControl(spec.control),
-    idle: spec.idle || 0,
     meta: spec.meta || '',
     label: spec.label || '',
   };
@@ -120,7 +119,6 @@ export function defaultToolbar(overrides = {}) {
     open: false,
     expand: false,
     control: 'default',
-    idle: 0,
     meta: '',
     label: '',
     code: '',
@@ -195,7 +193,7 @@ export function describeSandboxBlock(spec = {}) {
 
 const metaValue = (v) => (/[\s"]/.test(v) ? `"${escapeAttr(v)}"` : v);
 
-export function serializeSandboxMeta({ kind = 'figure', lang: language, type, w, h, bg, showCode, open, expand, control, idle, meta, label }) {
+export function serializeSandboxMeta({ kind = 'figure', lang: language, type, w, h, bg, showCode, open, expand, control, meta, label }) {
   if (kind === 'external') return { lang: language || 'text', meta: ['sandbox=external', label && `label=${metaValue(label)}`].filter(Boolean).join(' ') };
 
   const lang = language || 'js';
@@ -212,7 +210,6 @@ export function serializeSandboxMeta({ kind = 'figure', lang: language, type, w,
   else if (showCode) tokens.push('code');
   if (expand) tokens.push('expand');
   if (control && control !== 'default') tokens.push(`control=${control}`);
-  if (idle) tokens.push(`idle=${Math.max(0, Number(idle) || 0)}`);
   if (meta) tokens.push(`meta=${metaValue(meta)}`);
   if (label) tokens.push(`label=${metaValue(label)}`);
   return { lang, meta: tokens.join(' ') };
@@ -246,7 +243,6 @@ function tokenizeMeta(meta) {
 // ```js sandbox                shared source, pooled into every figure in the document
 // ```js sandbox=canvas         a figure — `sandbox=root` swaps the canvas for a div
 // ```vue sandbox=root          the fence's language only picks the highlighting; the code runs as JS
-// ```js sandbox=canvas idle=2000  a figure that sits at 2s in until it is played
 // ```js sandbox=canvas open    a figure that starts on its code — `open` also unfolds a shared source
 // ```js sandbox=canvas expand  a figure that can open over the whole page, and from there go fullscreen
 // ```text sandbox=external     https .js URLs, one per line — `label=Name` overrides the derived name
@@ -285,9 +281,8 @@ export function parseMeta(lang, meta) {
 
   const preset = role;
   const control = normalizeControl(values.control);
-  const idle = Math.max(0, Number(values.idle) || 0);
 
-  return { kind: 'figure', lang: language, preset, w, h, showCode, open, expand, bg, control, idle, label, meta: metaText };
+  return { kind: 'figure', lang: language, preset, w, h, showCode, open, expand, bg, control, label, meta: metaText };
 }
 
 // The shared js blocks in page order, each with the name the page shows it under, so an
@@ -346,7 +341,7 @@ export function sandboxExternals(blocks) {
 
 // `prelude` is the array `sandboxPreludeBlocks` gives, or a plain string for callers that
 // pooled the source themselves; the string form loses the per-block names in errors.
-export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: captureConsole, knobs }, code, prelude = '', externals = []) {
+export function buildSrcdoc({ preset, w, h, bg, hover, control, console: captureConsole, knobs }, code, prelude = '', externals = []) {
   const isCanvas = preset === 'canvas';
   const preludeBlocks = Array.isArray(prelude)
     ? prelude
@@ -366,16 +361,8 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const mode = normalizeControl(control);
   const isManual = mode === 'manual';
   const isHover = Boolean(hover) || mode === 'hover';
-  const idleT = Math.max(0, Number(idle) || 0);
-  // The frame a fresh `loop` draws first: the idle frame while parked there, otherwise the
-  // clock as it stands — zero on a first run, and wherever it got to when a knob re-runs it.
-  const startT = idleT ? `__idle?${idleT}:__now` : '__now';
-  const idleVar = idleT ? ',__idle=true' : '';
   const body = nameKnobs(code);
   const pre = nameKnobs(preludeCode);
-  const idleHome = idleT ? '__idle=true;' : '';
-  const leaveIdle = (teardown) =>
-    idleT ? `const __leaveIdle=()=>{if(__idle){__idle=false;${teardown}run()}};` : `const __leaveIdle=()=>{};`;
 
   const canPause = isCanvas && (mode === 'default' || mode === 'autoplay') && !isHover;
   const surface = isCanvas
@@ -438,22 +425,22 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const timed = canPause || isManual;
 
   const loopDef = isHover
-    ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${startT})};`
+    ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0;const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(__now)};`
     : isManual
 
-      ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(${startT});__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}};return __stop};`
+      ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0;const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{__fn=fn;fn(__now);__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}};return __stop};`
       : canPause
 
-        ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0${idleVar};const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{if(__stop)__stop();__fn=fn;fn(${startT});return (__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}})};`
+        ? `let __fn=null,__raf=null,__el=0,__t0=null,__now=0;const __tick=(ts)=>{if(__t0==null)__t0=ts;__now=__el+(ts-__t0);__fn(__now);if(__raf!=null)__raf=requestAnimationFrame(__tick)};const loop=(fn)=>{if(__stop)__stop();__fn=fn;fn(__now);return (__stop=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}})};`
         : `const loop=(fn)=>{if(__stop)__stop();let id,live=true,t0=null;const t=(ts)=>{if(t0==null)t0=ts;fn(ts-t0);if(live)id=requestAnimationFrame(t)};id=requestAnimationFrame(t);return (__stop=()=>{live=false;cancelAnimationFrame(id)})};`;
 
   const resetVars = resettable ? `let __stop=null,__cleanups=[];` : '';
 
   const resetHome = isManual
-    ? `${idleHome}__el=0;__t0=null;__now=0;__fn=null;run()`
+    ? `__el=0;__t0=null;__now=0;__fn=null;run()`
     : canPause
 
-      ? `${idleHome}__el=0;__t0=null;__now=0;__fn=null;__ctl.hidden=true;run();` + (deferred ? `__play.style.display='flex'` : `__resumeFig()`)
+      ? `__el=0;__t0=null;__now=0;__fn=null;__ctl.hidden=true;run();` + (deferred ? `__play.style.display='flex'` : `__resumeFig()`)
       : deferred
         ? `__play.style.display='flex'`
         : `run()`;
@@ -461,10 +448,8 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
   const resetApi = resettable
     ? `const onCleanup=(fn)=>{__cleanups.push(fn)};` +
       `const __teardown=()=>{if(__stop){__stop();__stop=null}__cleanups.forEach(function(fn){try{fn()}catch(_){}});__cleanups=[];${clearSurface}};` +
-      `const reset=()=>{__teardown();${resetHome};parent.postMessage({__sandboxReset:1},'*')};` +
-      leaveIdle('__teardown();')
-    : `const onCleanup=()=>{};const reset=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}${idleHome}__el=0;__t0=null;__now=0;__fn=null;run()};` +
-      leaveIdle('');
+      `const reset=()=>{__teardown();${resetHome};parent.postMessage({__sandboxReset:1},'*')};`
+    : `const onCleanup=()=>{};const reset=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null}__el=0;__t0=null;__now=0;__fn=null;run()};`;
 
   // A knob change runs the code again in place. Unlike reset it keeps the clock and whether
   // the figure was going, so dragging a slider tunes the animation instead of restarting it.
@@ -478,7 +463,7 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
       `const __ctlContrast=()=>{const c=getComputedStyle(document.body).backgroundColor.match(/[\\d.]+/g);__ctl.classList.toggle('on-dark',!!(c&&(c.length<4||+c[3]>0)&&(0.299*c[0]+0.587*c[1]+0.114*c[2])<128))};__ctlContrast();${bg ? '' : `addEventListener('message',function(e){if(e.data&&e.data.__sbxBg)requestAnimationFrame(__ctlContrast)});`}` +
       `const __pause=()=>{if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now;__ctl.hidden=false}};` +
 
-      `const __resumeFig=()=>{__ctl.hidden=true;${deferred ? `__play.style.display='none';` : ''}__leaveIdle();if(__raf==null&&__fn){__t0=null;__raf=requestAnimationFrame(__tick)}};` +
+      `const __resumeFig=()=>{__ctl.hidden=true;${deferred ? `__play.style.display='none';` : ''}if(__raf==null&&__fn){__t0=null;__raf=requestAnimationFrame(__tick)}};` +
       `canvas.addEventListener('click',()=>{if(__raf!=null)__pause();else if(__fn)__resumeFig()});` +
       `document.getElementById('__resume').addEventListener('click',e=>{e.stopPropagation();__resumeFig()});` +
       `document.getElementById('__rst').addEventListener('click',e=>{e.stopPropagation();reset()});`
@@ -493,10 +478,10 @@ export function buildSrcdoc({ preset, w, h, bg, hover, control, idle, console: c
       : playSetup + `__play.addEventListener('click',()=>{__play.style.display='none';start()});report();`
     : isManual
 
-      ? `start();addEventListener('message',function(e){if(!e.data)return;if(e.data.__figpause){if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now}}else if(e.data.__figplay){if(__raf==null&&__fn){__leaveIdle();__t0=null;__raf=requestAnimationFrame(__tick)}}else if(e.data.__figreset){reset()}});`
+      ? `start();addEventListener('message',function(e){if(!e.data)return;if(e.data.__figpause){if(__raf!=null){cancelAnimationFrame(__raf);__raf=null;__el=__now}}else if(e.data.__figplay){if(__raf==null&&__fn){__t0=null;__raf=requestAnimationFrame(__tick)}}else if(e.data.__figreset){reset()}});`
       : isHover
 
-        ? `start();addEventListener('message',function(e){if(!__fn||!e.data)return;if(e.data.__figplay){if(__raf==null){__leaveIdle();__t0=null;__raf=requestAnimationFrame(__tick)}}else if('__figplay' in e.data){reset()}});`
+        ? `start();addEventListener('message',function(e){if(!__fn||!e.data)return;if(e.data.__figplay){if(__raf==null){__t0=null;__raf=requestAnimationFrame(__tick)}}else if('__figplay' in e.data){reset()}});`
 
         : pauseControls + `start();` + (canPause ? `__resumeFig();` : ``);
   // Everything the srcdoc puts above the user's code is emitted on one line, so a line

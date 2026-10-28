@@ -19,8 +19,6 @@ const MODES = [
   ['none'],
   ['hover'],
   ['manual'],
-  ['default', 'idle=2000'],
-  ['hover', 'idle=2000'],
 ];
 
 const sample = (control, extra) =>
