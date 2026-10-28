@@ -3,7 +3,7 @@ import { renderMarkdown } from './render.js';
 const source = `
 ## canvas (+ knobs)
 
-\`\`\`js sandbox=canvas 480x260 control=autoplay code
+\`\`\`js sandbox=canvas 480x260 control=autoplay code expand
 const count = knob(60, { min: 6, max: 120 });
 const radius = knob(70, { min: 20, max: 110 });
 const dot = knob(3, { min: 1, max: 8 });
